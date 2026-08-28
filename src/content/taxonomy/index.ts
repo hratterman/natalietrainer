@@ -5,9 +5,28 @@ import { valuation } from "./valuation";
 import { dcf } from "./dcf";
 import { mna } from "./mna";
 import { lbo } from "./lbo";
+import { capmarkets } from "./capmarkets";
+import { credit } from "./credit";
+import { rx } from "./rx";
+import { markets } from "./markets";
+import { mental } from "./mental";
+import { behavioral } from "./behavioral";
 
 /** Every area in the canon, tier-1 (core) first. */
-export const AREAS: Area[] = [accounting, evValue, valuation, dcf, mna, lbo];
+export const AREAS: Area[] = [
+  accounting,
+  evValue,
+  valuation,
+  dcf,
+  mna,
+  lbo,
+  capmarkets,
+  credit,
+  rx,
+  markets,
+  mental,
+  behavioral,
+];
 
 export type SubtopicRef = { area: Area; subtopic: Subtopic };
 export type ArchetypeRef = SubtopicRef & { archetype: Archetype };
