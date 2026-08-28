@@ -46,7 +46,13 @@ function loadDashboardData() {
     now,
   ).slice(0, 5);
 
-  const sessions = repo.listSessions(8);
+  // Learn sessions belong to the fix-it queue, not the sessions list; a
+  // zero-question active session (failed seed) is unresumable noise.
+  const sessions = repo
+    .listSessions(20)
+    .filter((s) => s.mode !== "learn")
+    .filter((s) => s.status !== "active" || repo.getSessionQuestions(s.id).length > 0)
+    .slice(0, 8);
   const fixitsActive = repo.listActiveFixits().map(fixitView);
   return {
     heatmapAreas,

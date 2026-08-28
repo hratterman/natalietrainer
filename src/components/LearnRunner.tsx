@@ -44,6 +44,10 @@ export type LearnInitialState = {
     anchorQuestionId: string;
     turns: LearnChatTurn[];
     activeProof: LearnQuestionView | null;
+    /** Trailing consecutive proof passes already recorded server-side. */
+    passes: number;
+    /** Proving was underway (last proof passed) but no question is active — fetch the next. */
+    continueProving: boolean;
   } | null;
   proofTarget: number;
   voiceAvailable: boolean;
@@ -69,11 +73,12 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   const [proofAnswer, setProofAnswer] = useState("");
   const [proofStreaming, setProofStreaming] = useState<string | null>(null);
   const [proofGrade, setProofGrade] = useState<GradeView | null>(null);
-  const [passes, setPasses] = useState(0);
+  const [passes, setPasses] = useState(initial.resume?.passes ?? 0);
   const [lastProofFailed, setLastProofFailed] = useState(false);
 
   const [voiceOn, setVoiceOn] = useState(false);
   const startedRef = useRef(false);
+  const busyRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const phaseRef = useRef<Phase>("starting");
   const sessionIdRef = useRef<string | null>(initial.resume?.sessionId ?? null);
@@ -151,8 +156,18 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         if (initial.kind === "spotcheck") {
           const res = await fetch(`/api/fixits/${initial.fixit.id}/spotcheck`, { method: "POST" });
           if (!res.ok) throw new Error((await res.json()).error ?? "Could not start the spot-check");
-          const body = (await res.json()) as { sessionId: string; question: LearnQuestionView };
+          const body = (await res.json()) as {
+            sessionId: string;
+            question?: LearnQuestionView;
+            alreadyCompleted?: boolean;
+          };
           setSessionId(body.sessionId);
+          if (body.alreadyCompleted || !body.question) {
+            // A refresh raced the grade — the server finished it for us.
+            await refreshFixit();
+            setPhase("closed");
+            return;
+          }
           setProof(body.question);
           setPhase("proving");
           return;
@@ -164,6 +179,12 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         setSessionId(body.sessionId);
         if (initial.resume?.activeProof) {
           setPhase("proving");
+          return;
+        }
+        if (initial.resume?.continueProving) {
+          // Mid-proving refresh after a pass: fetch the next check question
+          // (or close out if the passes already sufficed).
+          await startCheck(body.sessionId);
           return;
         }
         setPhase("lesson");
@@ -179,6 +200,9 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   }, []);
 
   async function runCoachTurn(sid: string, text: string | null) {
+    // Synchronous gate: spoken turns can race typed sends / an in-flight stream.
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     if (text) {
       setChat((c) => [...c, { id: `you-${Date.now()}`, role: "you", content: text }]);
@@ -190,6 +214,11 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
+      if (res.status === 409 && text === null) {
+        // Another tab already opened this lesson — reload to pick up its transcript.
+        window.location.reload();
+        return;
+      }
       if (!res.ok || !res.body) {
         throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Coach unavailable");
       }
@@ -216,6 +245,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       setStreamingText(null);
       setError(err instanceof Error ? err.message : "Coach turn failed");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
@@ -227,12 +257,13 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
     await runCoachTurn(sessionId, text);
   }
 
-  async function startCheck() {
-    if (!sessionId) return;
+  async function startCheck(overrideSid?: string) {
+    const sid = overrideSid ?? sessionIdRef.current;
+    if (!sid) return;
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/next`, { method: "POST" });
+      const res = await fetch(`/api/sessions/${sid}/next`, { method: "POST" });
       if (!res.ok) throw new Error((await res.json()).error ?? "Could not get a check question");
       const body = (await res.json()) as { done: boolean; question?: LearnQuestionView };
       if (body.done || !body.question) {
@@ -265,6 +296,9 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
     const sid = sessionIdRef.current;
     const q = proofRef.current;
     if (!sid || !q) return;
+    // Synchronous gate against double submits / spoken-turn races.
+    if (busyRef.current) return;
+    busyRef.current = true;
     setProofTurns((t) => [...t, { role: "you", content: submitted }]);
     setBusy(true);
     setProofStreaming("");
@@ -274,6 +308,12 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ questionId: q.id, answer: submitted, voice: voicePayload }),
       });
+      if (res.status === 409) {
+        // The question moved on without us (second tab / double submit) —
+        // the server has the truth; re-enter from it.
+        window.location.reload();
+        return;
+      }
       if (!res.ok || !res.body) {
         throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Failed to submit");
       }
@@ -301,12 +341,15 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       setProofStreaming(null);
       setError(err instanceof Error ? err.message : "Failed to submit");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
 
   async function gradeProof(questionId: string) {
-    const res = await fetch(`/api/sessions/${sessionId}/grade`, {
+    // Mic down while the grade lands — nothing she says now is an answer.
+    voiceRef.current.endListening();
+    const res = await fetch(`/api/sessions/${sessionIdRef.current}/grade`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ questionId }),
@@ -560,6 +603,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
           )
         )}
         {busy && proofStreaming === null && !proofGrade && <Spinner label="Grading…" />}
+        {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
       </div>
     );
   }

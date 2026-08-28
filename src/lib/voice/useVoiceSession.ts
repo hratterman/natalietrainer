@@ -75,6 +75,12 @@ export function useVoiceSession(opts: {
 
   const controllerRef = useRef<VoiceController | null>(null);
   const personaIdRef = useRef(opts.personaId);
+  // Keep the persona in sync with props while no transport is live (e.g. a
+  // superday resumed mid-round) — a live connection only switches via
+  // reconnect(), which owns the transport restart.
+  useEffect(() => {
+    if (!controllerRef.current) personaIdRef.current = opts.personaId;
+  }, [opts.personaId]);
 
   // Per-turn timing accumulation
   const turnStartRef = useRef<number | null>(null);

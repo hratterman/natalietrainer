@@ -13,6 +13,10 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
   const { sessionId } = await params;
   const state = repo.getSessionWithTranscript(sessionId);
   if (!state) notFound();
+  // Learn sessions have no debrief — their transcript is coach chat.
+  if (state.session.mode === "learn") {
+    redirect(`/learn/${state.session.configJson.fixitId ?? ""}`);
+  }
   if (state.session.status === "active") redirect(`/train/${sessionId}`);
 
   const debrief = state.session.debriefJson as Debrief | null;

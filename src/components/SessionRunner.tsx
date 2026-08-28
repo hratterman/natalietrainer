@@ -41,6 +41,8 @@ export type RunnerInitialState = {
   session: SessionView;
   questions: (QuestionView & { turns: TurnView[] })[];
   activeQuestionId: string | null;
+  /** Superday: which round the active question belongs to (resume-safe). */
+  initialRoundIndex: number | null;
   followUpCap: number;
   areaNames: Record<string, string>;
   personaNames: Record<string, string>;
@@ -78,15 +80,16 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
   const [answeredCount, setAnsweredCount] = useState(
     () => initial.questions.filter((q) => q.status !== "active").length,
   );
-  const [roundIndex, setRoundIndex] = useState<number | null>(() =>
-    initial.session.mode === "superday" && initial.activeQuestionId ? 0 : null,
-  );
+  const [roundIndex, setRoundIndex] = useState<number | null>(initial.initialRoundIndex);
   const [pendingRound, setPendingRound] = useState<number | null>(null);
 
   const [voiceActive, setVoiceActive] = useState(session.configJson.voiceMode === true);
   const [phase, setPhase] = useState<Phase>(() => {
-    if (!initial.activeQuestionId) return "completing";
-    return session.configJson.voiceMode === true ? "voiceCheck" : "answering";
+    // No active question (refresh on a review/grading screen): voice sessions
+    // reconnect via the voice check first; typed sessions advance on mount.
+    if (session.configJson.voiceMode === true) return "voiceCheck";
+    if (!initial.activeQuestionId) return "advancing";
+    return "answering";
   });
   const [answer, setAnswer] = useState("");
   const [scratchpad, setScratchpad] = useState("");
@@ -99,6 +102,9 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
 
   const answerStartRef = useRef(0);
   const completedRef = useRef(false);
+  const submittingRef = useRef(false);
+  const advancingRef = useRef(false);
+  const bootedRef = useRef(false);
   const phaseRef = useRef<Phase>(phase);
   const questionRef = useRef(question);
   const bargedRef = useRef(false);
@@ -159,7 +165,12 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       // Voice failures degrade to typing, never dead-end the session.
       setVoiceActive(false);
       setError(`Voice dropped (${message}) — continuing with typing.`);
-      if (phaseRef.current === "listening" || phaseRef.current === "interviewerSpeaking") {
+      if (
+        phaseRef.current === "listening" ||
+        phaseRef.current === "interviewerSpeaking" ||
+        phaseRef.current === "roundBreak" ||
+        phaseRef.current === "voiceCheck"
+      ) {
         setPhase("answering");
       }
     },
@@ -168,6 +179,21 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
   useEffect(() => {
     voiceRef.current = voice;
   }, [voice]);
+
+  const advanceRef = useRef(advance);
+  useEffect(() => {
+    advanceRef.current = advance;
+  });
+  // Resuming with no active question (refresh on a review/grading screen):
+  // typed sessions fetch the next question immediately; voice sessions go
+  // through the voice check first and advance from there.
+  useEffect(() => {
+    if (bootedRef.current) return;
+    bootedRef.current = true;
+    if (!initial.activeQuestionId && initial.session.configJson.voiceMode !== true) {
+      void advanceRef.current();
+    }
+  }, [initial.activeQuestionId, initial.session.configJson.voiceMode]);
 
   function voiceBeginListening() {
     voiceRef.current.beginListening();
@@ -207,10 +233,13 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
             voiceRef.current.speakDelta(text);
           },
         });
-        setTurns((t) => [
-          ...t,
-          { id: `local-open-${Date.now()}`, role: "interviewer", content: spoken },
-        ]);
+        // A replayed opening (refresh) is already in the transcript — don't
+        // show it twice.
+        setTurns((t) =>
+          t.some((x) => x.role === "interviewer" && x.content === spoken)
+            ? t
+            : [...t, { id: `local-open-${Date.now()}`, role: "interviewer", content: spoken }],
+        );
         setStreamingText("");
         if (!bargedRef.current) {
           await voiceRef.current.speakFlush();
@@ -228,6 +257,8 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
     }
 
   async function advance() {
+    if (advancingRef.current) return;
+    advancingRef.current = true;
     setPhase("advancing");
     try {
       const res = await fetch(`/api/sessions/${session.id}/next`, { method: "POST" });
@@ -251,10 +282,56 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       }
       setRoundIndex(nextRound);
       resetForQuestion(body.question);
-      if (voiceActive) await openQuestion(body.question);
+      if (voiceActive && voiceRef.current.status === "ready") await openQuestion(body.question);
       else setPhase("answering");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to advance");
+      setPhase("error");
+    } finally {
+      advancingRef.current = false;
+    }
+  }
+
+  /**
+   * The server said our view of the question is stale (409) or a reply stream
+   * died — re-pull the session and land wherever it actually is.
+   */
+  async function resyncFromServer() {
+    try {
+      const stateRes = await fetch(`/api/sessions/${session.id}`);
+      if (!stateRes.ok) throw new Error("Failed to reload the session.");
+      const state = (await stateRes.json()) as {
+        session: { status: string };
+        activeQuestionId: string | null;
+        questions: (QuestionView & { turns: TurnView[] })[];
+      };
+      if (state.session.status !== "active") {
+        router.push(`/train/${session.id}/debrief`);
+        return;
+      }
+      const active = state.questions.find((q) => q.id === state.activeQuestionId);
+      if (active) {
+        const sameQuestion = questionRef.current?.id === active.id;
+        setQuestion(active);
+        setTurns(active.turns);
+        setStreamingText("");
+        if (!sameQuestion) {
+          setAnswer("");
+          setScratchpad("");
+          setGrade(null);
+        }
+        answerStartRef.current = Date.now();
+        if (voiceActive && voiceRef.current.status === "ready") voiceBeginListening();
+        else setPhase("answering");
+        return;
+      }
+      // Our question wrapped up while we weren't looking: grade it (idempotent
+      // server-side) and keep moving. Rapid grades everything at completion.
+      const q = questionRef.current;
+      if (!q || mode === "rapid") await complete();
+      else await runGrade(q.id, mode === "drill");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reload the session.");
       setPhase("error");
     }
   }
@@ -286,6 +363,9 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
 
   async function submitRapid(finalAnswer: string) {
       if (!questionRef.current) return;
+      // Synchronous gate: the buzzer and a manual Enter can fire the same tick.
+      if (submittingRef.current) return;
+      submittingRef.current = true;
       setPhase("advancing");
       try {
         const res = await fetch(`/api/sessions/${session.id}/answer`, {
@@ -297,6 +377,11 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
             elapsedMs: Date.now() - answerStartRef.current,
           }),
         });
+        if (res.status === 409) {
+          // Another submit beat us to it — trust the server's state.
+          await resyncFromServer();
+          return;
+        }
         if (!res.ok) throw new Error((await res.json()).error ?? "Failed to submit");
         setAnsweredCount((n) => n + 1);
         const stateRes = await fetch(`/api/sessions/${session.id}`);
@@ -314,6 +399,8 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to submit");
         setPhase("error");
+      } finally {
+        submittingRef.current = false;
       }
     }
 
@@ -322,6 +409,9 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       extras: { scratchpad?: string | null; voice?: SpokenTurnPayload["voice"] | null },) {
       const q = questionRef.current;
       if (!q) return;
+      // Synchronous gate against double-click / spoken-turn races.
+      if (submittingRef.current) return;
+      submittingRef.current = true;
       const candidateTurn: TurnView = {
         id: `local-${Date.now()}`,
         role: "candidate",
@@ -346,6 +436,12 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
             voice: extras.voice ?? null,
           }),
         });
+        if (res.status === 409) {
+          // The question moved on without us (double submit, second tab) —
+          // trust the server's state rather than erroring out.
+          await resyncFromServer();
+          return;
+        }
         if (!res.ok || !res.body) {
           throw new Error(
             res.ok ? "No response stream" : ((await res.json()).error ?? "Failed to submit answer"),
@@ -363,12 +459,19 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
             done = d;
           },
         });
+        if (!done) {
+          // Truncated stream: the server most likely finished its side — never
+          // guess "wrapup" and grade a half-heard reply. Re-pull the truth.
+          setStreamingText("");
+          await resyncFromServer();
+          return;
+        }
         setTurns((t) => [
           ...t,
           { id: `local-i-${Date.now()}`, role: "interviewer", content: spoken },
         ]);
         setStreamingText("");
-        const action = (done as { action: string } | null)?.action ?? "wrapup";
+        const action = (done as { action: string }).action;
         if (action === "wrapup") {
           if (voiceActive && !bargedRef.current) await voiceRef.current.speakFlush();
           await runGrade(q.id, mode === "drill");
@@ -385,6 +488,8 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to submit answer");
         setPhase("error");
+      } finally {
+        submittingRef.current = false;
       }
     }
 
@@ -469,14 +574,17 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
   function beginVoiceInterview() {
     voiceRef.current.endListening();
     const q = questionRef.current;
+    // Resuming with no active question (refresh on a review screen): fetch one.
     if (q) void openQuestion(q);
+    else void advance();
   }
 
   function continueTyping() {
     voiceRef.current.disconnect();
     setVoiceActive(false);
     setError(null);
-    setPhase("answering");
+    if (questionRef.current) setPhase("answering");
+    else void advance();
   }
 
   // ---------- render ----------
@@ -496,9 +604,8 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
         <div className="mt-4 flex gap-3">
           <button
             onClick={() => {
-              setError(null);
-              setPhase(voiceActive ? "listening" : "answering");
-              if (voiceActive) voiceRef.current.beginListening();
+              // Nothing is lost server-side — reload and resume from truth.
+              window.location.reload();
             }}
             className="rounded bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700"
           >
@@ -511,19 +618,6 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
             End session &amp; debrief
           </button>
         </div>
-      </CenterCard>
-    );
-  }
-
-  if (!question) {
-    return (
-      <CenterCard title="No active question">
-        <button
-          onClick={() => void complete()}
-          className="rounded bg-indigo-600 px-4 py-2 text-sm hover:bg-indigo-500"
-        >
-          Finish session
-        </button>
       </CenterCard>
     );
   }
@@ -589,13 +683,48 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
                 // hook degrades to typing via onError
               }
               const q = questionRef.current;
-              if (q && voiceRef.current.status !== "error") await openQuestion(q);
+              if (q && voiceRef.current.status !== "error") {
+                await openQuestion(q);
+              } else {
+                // Reconnect failed: never leave a control-less screen.
+                setVoiceActive(false);
+                setPhase("answering");
+              }
             })();
           } else {
             setPhase("answering");
           }
         }}
       />
+    );
+  }
+
+  if (!question) {
+    if (phase === "advancing") {
+      return (
+        <CenterCard title="Picking up where you left off…">
+          <Spinner label="Fetching the next question" />
+        </CenterCard>
+      );
+    }
+    // Reachable fallback (should be rare): let her move forward, not just end.
+    return (
+      <CenterCard title="No active question">
+        <div className="flex justify-center gap-3">
+          <button
+            onClick={() => void advance()}
+            className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500"
+          >
+            Continue
+          </button>
+          <button
+            onClick={() => void complete()}
+            className="rounded bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700"
+          >
+            Finish session
+          </button>
+        </div>
+      </CenterCard>
     );
   }
 
@@ -863,6 +992,7 @@ function RoundBreak({
 }) {
   const [secondsLeft, setSecondsLeft] = useState(60);
   const onStartRef = useRef(onStart);
+  const firedRef = useRef(false);
   useEffect(() => {
     onStartRef.current = onStart;
   }, [onStart]);
@@ -873,7 +1003,10 @@ function RoundBreak({
       setSecondsLeft(Math.max(0, left));
       if (left <= 0) {
         clearInterval(iv);
-        onStartRef.current();
+        if (!firedRef.current) {
+          firedRef.current = true;
+          onStartRef.current();
+        }
       }
     }, 1000);
     return () => clearInterval(iv);
@@ -887,7 +1020,12 @@ function RoundBreak({
         Take a breath. Next round starts in {secondsLeft}s.
       </p>
       <button
-        onClick={onStart}
+        onClick={() => {
+          // "Start now" and the timer hitting zero must not both fire.
+          if (firedRef.current) return;
+          firedRef.current = true;
+          onStartRef.current();
+        }}
         className="mt-4 rounded bg-indigo-600 px-5 py-2 text-sm font-semibold hover:bg-indigo-500"
       >
         I&apos;m ready — start now

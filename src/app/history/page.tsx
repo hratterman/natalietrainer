@@ -6,7 +6,8 @@ import type { Debrief } from "@/lib/llm/schemas";
 export const dynamic = "force-dynamic";
 
 export default function HistoryPage() {
-  const sessions = repo.listSessions(100);
+  // Learn sessions (lessons/spot-checks) live in the fix-it queue, not here.
+  const sessions = repo.listSessions(100).filter((s) => s.mode !== "learn");
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-xl font-semibold text-slate-100">Session history</h1>

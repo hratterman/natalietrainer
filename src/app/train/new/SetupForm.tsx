@@ -84,9 +84,11 @@ export function SetupForm({
   const [difficulty, setDifficulty] = useState<number | "adaptive">(
     prefillDifficulty ? Number(prefillDifficulty) : "adaptive",
   );
-  const [questionCount, setQuestionCount] = useState(mode === "rapid" ? 10 : 5);
+  // Number inputs are kept as strings and clamped at submit — a cleared or
+  // garbage field must never send NaN to the server.
+  const [questionCount, setQuestionCount] = useState(String(mode === "rapid" ? 10 : 5));
   const [personaId, setPersonaId] = useState("quant");
-  const [secondsPerQuestion, setSecondsPerQuestion] = useState(45);
+  const [secondsPerQuestion, setSecondsPerQuestion] = useState("45");
   const [voiceMode, setVoiceMode] = useState(voiceAvailable);
   const [superdayRounds, setSuperdayRounds] = useState(DEFAULT_SUPERDAY_ROUNDS);
   const [starting, setStarting] = useState(false);
@@ -97,6 +99,12 @@ export function SetupForm({
     [subtopicIds],
   );
 
+  const clampInt = (raw: string, min: number, max: number, fallback: number) => {
+    const n = Number.parseInt(raw, 10);
+    if (Number.isNaN(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  };
+
   const start = async () => {
     setStarting(true);
     setError(null);
@@ -104,9 +112,10 @@ export function SetupForm({
       subtopicIds: mode === "drill" ? subtopicIds : [],
       areaIds: mode === "drill" ? [] : areaIds,
       difficulty,
-      questionCount: mode === "superday" ? 12 : questionCount,
+      questionCount:
+        mode === "superday" ? 12 : clampInt(questionCount, 1, 30, mode === "rapid" ? 10 : 5),
       personaId: mode === "mock" || mode === "superday" || mode === "drill" ? personaId : null,
-      secondsPerQuestion: mode === "rapid" ? secondsPerQuestion : null,
+      secondsPerQuestion: mode === "rapid" ? clampInt(secondsPerQuestion, 10, 600, 45) : null,
       rounds: mode === "superday" ? superdayRounds : null,
       // Rapid-fire stays typed: silence detection fights the hard countdown.
       voiceMode: mode !== "rapid" && voiceAvailable && voiceMode,
@@ -310,7 +319,7 @@ export function SetupForm({
                 min={1}
                 max={30}
                 value={questionCount}
-                onChange={(e) => setQuestionCount(Number(e.target.value))}
+                onChange={(e) => setQuestionCount(e.target.value)}
                 className="mt-2 w-24 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
               />
             </div>
@@ -340,7 +349,7 @@ export function SetupForm({
                   min={10}
                   max={600}
                   value={secondsPerQuestion}
-                  onChange={(e) => setSecondsPerQuestion(Number(e.target.value))}
+                  onChange={(e) => setSecondsPerQuestion(e.target.value)}
                   className="mt-2 w-24 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
                 />
               </div>

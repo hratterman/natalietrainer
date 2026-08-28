@@ -21,6 +21,11 @@ export default async function TrainSessionPage({
   if (state.session.status === "completed") redirect(`/train/${sessionId}/debrief`);
 
   const active = repo.getActiveQuestion(sessionId);
+  // Superday resumes must land in the round the active question belongs to,
+  // not round 0.
+  const activeRound = active?.roundId
+    ? (state.rounds.find((r) => r.id === active.roundId)?.roundIndex ?? null)
+    : null;
 
   const initial: RunnerInitialState = {
     session: {
@@ -55,6 +60,7 @@ export default async function TrainSessionPage({
       })),
     })),
     activeQuestionId: active?.id ?? null,
+    initialRoundIndex: mode === "superday" ? activeRound : null,
     followUpCap: FOLLOW_UP_CAPS[state.session.mode],
     areaNames: Object.fromEntries(AREAS.map((a) => [a.id, a.name])),
     personaNames: Object.fromEntries(PERSONAS.map((p) => [p.id, p.name])),

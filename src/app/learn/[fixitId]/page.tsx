@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import * as repo from "@/lib/db/repo";
 import { fixitView } from "@/lib/api/fixitView";
-import { PROOF_PASSES_REQUIRED } from "@/lib/fixit";
+import { PROOF_PASSES_REQUIRED, proofPassed } from "@/lib/fixit";
 import { voiceAvailable } from "@/lib/voice/openai";
 import {
   LearnRunner,
@@ -73,6 +73,20 @@ export default async function LearnPage({ params, searchParams }: PageProps<"/le
             : t.content,
         }));
         const active = repo.getActiveQuestion(session.id);
+        // Rebuild proving progress so a refresh doesn't forget a pass (or
+        // wrongly return to proving after a fail sent her back to the lesson).
+        const gradedProofs = repo
+          .getSessionQuestions(session.id)
+          .filter((q) => q.askedIndex > 0)
+          .map((q) => repo.getGrade(q.id))
+          .filter((g) => g !== undefined);
+        let passes = 0;
+        for (let i = gradedProofs.length - 1; i >= 0; i--) {
+          if (proofPassed(gradedProofs[i]!.overall)) passes++;
+          else break;
+        }
+        const lastFailed =
+          gradedProofs.length > 0 && !proofPassed(gradedProofs[gradedProofs.length - 1]!.overall);
         resume = {
           sessionId: session.id,
           anchorQuestionId: anchor.id,
@@ -86,6 +100,9 @@ export default async function LearnPage({ params, searchParams }: PageProps<"/le
                   difficulty: active.difficulty,
                 }
               : null,
+          passes,
+          continueProving:
+            (!active || active.askedIndex === 0) && gradedProofs.length > 0 && !lastFailed,
         };
       }
     }
