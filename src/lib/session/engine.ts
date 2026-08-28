@@ -196,9 +196,28 @@ export async function startSession(mode: Mode, config: SessionConfig): Promise<r
   return repo.getSession(session.id)!;
 }
 
-/** Count interviewer turns already taken on a question. */
+/** The persona actually interviewing this question (superday rounds override the session default). */
+export function personaIdForQuestion(
+  session: repo.SessionRow,
+  question: repo.QuestionRow,
+): string | null {
+  if (question.roundId) {
+    const round = repo.getRounds(session.id).find((r) => r.id === question.roundId);
+    if (round) return round.personaId;
+  }
+  return session.configJson.personaId;
+}
+
+/**
+ * Count real interviewer follow-ups on a question. Canned interjections and
+ * the spoken question opening don't consume the follow-up budget.
+ */
 export function followUpsUsed(questionId: string): number {
-  return repo.getTurns(questionId).filter((t) => t.role === "interviewer").length;
+  return repo
+    .getTurns(questionId)
+    .filter(
+      (t) => t.role === "interviewer" && t.interruption !== "interjection" && t.turnIndex > 0,
+    ).length;
 }
 
 /** Grade an answered question and persist the grade + mastery update. */
@@ -209,29 +228,35 @@ export async function gradeAndRecord(questionId: string): Promise<Grade & { alre
       accuracy: existing.accuracy,
       completeness: existing.completeness,
       structure: existing.structure,
+      delivery: existing.delivery,
       overall: existing.overall,
       modelAnswer: existing.modelAnswer,
       strengths: existing.feedbackJson.strengths,
       gaps: existing.feedbackJson.gaps,
       corrections: existing.feedbackJson.corrections,
+      deliveryFeedback: existing.feedbackJson.delivery ?? [],
       alreadyGraded: true,
     };
   }
   const question = repo.getQuestion(questionId);
   if (!question) throw new Error(`question ${questionId} not found`);
+  const session = repo.getSession(question.sessionId);
+  const voice = session?.configJson.voiceMode === true;
   const turns = repo.getTurns(questionId);
-  const grade = await gradeQuestion(question, turns);
+  const grade = await gradeQuestion(question, turns, voice);
   repo.recordGrade({
     questionId,
     accuracy: grade.accuracy,
     completeness: grade.completeness,
     structure: grade.structure,
+    delivery: voice ? grade.delivery : null,
     overall: grade.overall,
     modelAnswer: grade.modelAnswer,
     feedback: {
       strengths: grade.strengths,
       gaps: grade.gaps,
       corrections: grade.corrections,
+      ...(voice && grade.deliveryFeedback.length > 0 ? { delivery: grade.deliveryFeedback } : {}),
     },
   });
   return { ...grade, alreadyGraded: false };

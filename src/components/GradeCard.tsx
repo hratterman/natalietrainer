@@ -8,11 +8,13 @@ export type GradeView = {
   accuracy: number;
   completeness: number;
   structure: number;
+  delivery?: number | null;
   overall: number;
   modelAnswer: string;
   strengths: string[];
   gaps: string[];
   corrections: string[];
+  deliveryFeedback?: string[];
 };
 
 export function GradeCard({ grade, defaultOpen = false }: { grade: GradeView; defaultOpen?: boolean }) {
@@ -26,6 +28,7 @@ export function GradeCard({ grade, defaultOpen = false }: { grade: GradeView; de
             accuracy={grade.accuracy}
             completeness={grade.completeness}
             structure={grade.structure}
+            delivery={grade.delivery}
           />
         </div>
       </div>
@@ -38,6 +41,9 @@ export function GradeCard({ grade, defaultOpen = false }: { grade: GradeView; de
       )}
       {grade.corrections.length > 0 && (
         <FeedbackList title="Corrections" items={grade.corrections} tone="text-rose-400" />
+      )}
+      {grade.deliveryFeedback && grade.deliveryFeedback.length > 0 && (
+        <FeedbackList title="Delivery" items={grade.deliveryFeedback} tone="text-sky-400" />
       )}
 
       <button

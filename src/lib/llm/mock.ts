@@ -40,13 +40,20 @@ export function mockRapidBatch(
   return { questions };
 }
 
-export function mockGrade(answerLength: number): Grade {
+export function mockGrade(answerLength: number, voice = false): Grade {
   // Deterministic but varies with answer length so the UI shows a range.
   const base = Math.min(9, 4 + Math.floor(answerLength / 80));
   return {
     accuracy: base,
     completeness: Math.max(2, base - 1),
     structure: Math.min(10, base + 1),
+    delivery: voice ? Math.max(1, base - 2) : null,
+    deliveryFeedback: voice
+      ? [
+          "[MOCK] Lead with the roadmap before the walk.",
+          "[MOCK] Pace held up; trim the hedges in the opening sentence.",
+        ]
+      : [],
     overall: base * 10,
     modelAnswer:
       "[MOCK model answer] Start on the income statement: pre-tax income falls $10, taxes fall $2.50, net income falls $7.50. On the cash flow statement, net income is down $7.50 but the $10 is added back as non-cash, so cash rises $2.50. On the balance sheet, cash +$2.50, PP&E -$10, retained earnings -$7.50 — balanced.",
@@ -54,6 +61,15 @@ export function mockGrade(answerLength: number): Grade {
     gaps: ["[MOCK] Did not state the final balance check"],
     corrections: ["[MOCK] You said cash falls; cash rises $2.50 because the add-back exceeds the NI hit."],
   };
+}
+
+export function mockInterviewerOpen(input: {
+  questionText: string;
+  isRoundStart: boolean;
+  greeting: string | undefined;
+}): string {
+  const greet = input.isRoundStart && input.greeting ? `${input.greeting} ` : "";
+  return `{"action":"ask"}\n${greet}Here's one for you: ${input.questionText}`;
 }
 
 export function mockInterviewerReply(turnCount: number, maxFollowUps: number): string {

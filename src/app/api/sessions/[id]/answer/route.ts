@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import * as repo from "@/lib/db/repo";
-import { FOLLOW_UP_CAPS, followUpsUsed } from "@/lib/session/engine";
+import { FOLLOW_UP_CAPS, followUpsUsed, personaIdForQuestion } from "@/lib/session/engine";
 import { interviewerTurn } from "@/lib/llm/interviewer";
+import { computeDeliveryMetrics } from "@/lib/voice/deliveryMetrics";
 import { errorResponse, parseBody } from "@/lib/api/validate";
 
 const answerSchema = z.object({
@@ -10,6 +11,17 @@ const answerSchema = z.object({
   answer: z.string().min(1),
   scratchpad: z.string().nullable().optional(),
   elapsedMs: z.number().int().min(0).nullable().optional(),
+  /** Spoken answers: client-measured timing + interruption context. */
+  voice: z
+    .object({
+      audioDurationMs: z.number().int().min(0),
+      pausesMs: z.array(z.number().int().min(0)).max(100),
+      bargeIn: z.boolean(),
+      /** How many chars of the previous interviewer reply she actually heard. */
+      heardChars: z.number().int().min(0).optional(),
+    })
+    .nullable()
+    .optional(),
 });
 
 /**
@@ -33,6 +45,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       return NextResponse.json({ error: "Question is no longer active." }, { status: 409 });
     }
 
+    const voice = body.data.voice ?? null;
     const priorTurns = repo.getTurns(question.id);
     repo.appendTurn({
       questionId: question.id,
@@ -40,6 +53,14 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
       content: body.data.answer,
       scratchpad: body.data.scratchpad ?? null,
       elapsedMs: body.data.elapsedMs ?? null,
+      interruption: voice?.bargeIn ? "barge_in" : null,
+      audioDurationMs: voice?.audioDurationMs ?? null,
+      deliveryMetrics: voice
+        ? computeDeliveryMetrics(body.data.answer, {
+            audioDurationMs: voice.audioDurationMs,
+            pausesMs: voice.pausesMs,
+          })
+        : null,
     });
 
     if (session.mode === "rapid") {
@@ -58,12 +79,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         try {
           const gen = interviewerTurn({
             mode: session.mode,
-            personaId: session.configJson.personaId,
+            personaId: personaIdForQuestion(session, question),
             question,
             priorTurns,
             answer: body.data.answer,
             scratchpad: body.data.scratchpad ?? null,
             forceWrapup,
+            voice: session.configJson.voiceMode === true,
           });
           let result = await gen.next();
           while (!result.done) {

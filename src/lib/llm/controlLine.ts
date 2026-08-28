@@ -7,7 +7,7 @@
  * SSE route and the mock stream.
  */
 
-export type InterviewerAction = "followup" | "wrapup";
+export type InterviewerAction = "followup" | "wrapup" | "ask";
 
 export type ParsedControlLine = {
   action: InterviewerAction;
@@ -76,7 +76,9 @@ export function parseControlLine(line: string): InterviewerAction | null {
   if (!line.startsWith("{")) return null;
   try {
     const obj = JSON.parse(line) as { action?: unknown };
-    if (obj.action === "followup" || obj.action === "wrapup") return obj.action;
+    if (obj.action === "followup" || obj.action === "wrapup" || obj.action === "ask") {
+      return obj.action;
+    }
     return null;
   } catch {
     return null;

@@ -2,15 +2,19 @@ export function RubricBars({
   accuracy,
   completeness,
   structure,
+  delivery,
 }: {
   accuracy: number;
   completeness: number;
   structure: number;
+  /** Spoken answers only; hidden when null/undefined. */
+  delivery?: number | null;
 }) {
   const rows: [string, number][] = [
     ["Accuracy", accuracy],
     ["Completeness", completeness],
     ["Structure", structure],
+    ...(delivery != null ? ([["Delivery", delivery]] as [string, number][]) : []),
   ];
   return (
     <div className="space-y-2">

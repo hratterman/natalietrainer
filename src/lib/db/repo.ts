@@ -160,6 +160,9 @@ export function appendTurn(input: {
   content: string;
   scratchpad?: string | null;
   elapsedMs?: number | null;
+  interruption?: import("./schema").Interruption | null;
+  audioDurationMs?: number | null;
+  deliveryMetrics?: import("./schema").DeliveryMetricsStored | null;
 }): TurnRow {
   const db = getDb();
   const existing = db
@@ -177,6 +180,9 @@ export function appendTurn(input: {
     content: input.content,
     scratchpad: input.scratchpad ?? null,
     elapsedMs: input.elapsedMs ?? null,
+    interruption: input.interruption ?? null,
+    audioDurationMs: input.audioDurationMs ?? null,
+    deliveryMetricsJson: input.deliveryMetrics ?? null,
     createdAt: new Date(),
   };
   db.insert(turns).values(row).run();
@@ -197,6 +203,7 @@ export function recordGrade(input: {
   accuracy: number;
   completeness: number;
   structure: number;
+  delivery?: number | null;
   overall: number;
   modelAnswer: string;
   feedback: GradeFeedback;
@@ -211,6 +218,7 @@ export function recordGrade(input: {
     accuracy: input.accuracy,
     completeness: input.completeness,
     structure: input.structure,
+    delivery: input.delivery ?? null,
     overall: input.overall,
     modelAnswer: input.modelAnswer,
     feedbackJson: input.feedback,

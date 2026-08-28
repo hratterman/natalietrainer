@@ -40,6 +40,14 @@ export const gradeSchema = z.object({
     .min(0)
     .max(10)
     .describe("0-10. Communication: ordered, confident, interview-ready delivery."),
+  delivery: z
+    .number()
+    .min(0)
+    .max(10)
+    .nullable()
+    .describe(
+      "Spoken answers only: 0-10 for framing, pace, fillers, and composure per the delivery anchors. MUST be null for typed transcripts.",
+    ),
   overall: z
     .number()
     .min(0)
@@ -53,6 +61,11 @@ export const gradeSchema = z.object({
   corrections: z
     .array(z.string())
     .describe("Concrete corrections: 'you said X; the right answer is Y because Z'."),
+  deliveryFeedback: z
+    .array(z.string())
+    .describe(
+      "Spoken answers only: specific delivery feedback (framing, fillers, pace, composure). Empty array for typed transcripts.",
+    ),
 });
 export type Grade = z.infer<typeof gradeSchema>;
 

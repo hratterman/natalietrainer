@@ -29,6 +29,8 @@ export type SessionConfig = {
         questionCount: number;
       }[]
     | null;
+  /** Spoken interview (mic in, interviewer voice out). Absent on old rows = false. */
+  voiceMode?: boolean;
 };
 
 export const sessions = sqliteTable("sessions", {
@@ -74,6 +76,19 @@ export const questions = sqliteTable("questions", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
+/** How a spoken turn related to an interruption, if at all. */
+export const INTERRUPTIONS = ["cut_off", "barge_in", "interjection"] as const;
+export type Interruption = (typeof INTERRUPTIONS)[number];
+
+export type DeliveryMetricsStored = {
+  wordCount: number;
+  wpm: number | null;
+  fillerCount: number;
+  hedgeCount: number;
+  pauseCount: number;
+  longestPauseMs: number;
+};
+
 export const turns = sqliteTable("turns", {
   id: text("id").primaryKey(),
   questionId: text("question_id")
@@ -85,6 +100,16 @@ export const turns = sqliteTable("turns", {
   /** Candidate turns only: the math scratchpad contents at submit time. */
   scratchpad: text("scratchpad"),
   elapsedMs: integer("elapsed_ms"),
+  /**
+   * cut_off = candidate turn ended by an interviewer interjection;
+   * barge_in = candidate turn began by talking over the interviewer;
+   * interjection = interviewer canned cut-off line.
+   */
+  interruption: text("interruption").$type<Interruption>(),
+  /** Spoken turns: total speaking time from VAD segments. */
+  audioDurationMs: integer("audio_duration_ms"),
+  /** Spoken candidate turns: server-computed delivery signals. */
+  deliveryMetricsJson: text("delivery_metrics_json", { mode: "json" }).$type<DeliveryMetricsStored>(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
@@ -92,6 +117,8 @@ export type GradeFeedback = {
   strengths: string[];
   gaps: string[];
   corrections: string[];
+  /** Spoken answers only: feedback on framing, fillers, pace, composure. */
+  delivery?: string[];
 };
 
 export const grades = sqliteTable("grades", {
@@ -103,6 +130,8 @@ export const grades = sqliteTable("grades", {
   accuracy: real("accuracy").notNull(),
   completeness: real("completeness").notNull(),
   structure: real("structure").notNull(),
+  /** Spoken answers only (0–10); null for typed answers. */
+  delivery: real("delivery"),
   overall: real("overall").notNull(),
   modelAnswer: text("model_answer").notNull(),
   feedbackJson: text("feedback_json", { mode: "json" }).$type<GradeFeedback>().notNull(),

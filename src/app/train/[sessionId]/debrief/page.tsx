@@ -151,11 +151,13 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
                     accuracy: q.grade.accuracy,
                     completeness: q.grade.completeness,
                     structure: q.grade.structure,
+                    delivery: q.grade.delivery,
                     overall: q.grade.overall,
                     modelAnswer: q.grade.modelAnswer,
                     strengths: q.grade.feedbackJson.strengths,
                     gaps: q.grade.feedbackJson.gaps,
                     corrections: q.grade.feedbackJson.corrections,
+                    deliveryFeedback: q.grade.feedbackJson.delivery,
                   }}
                 />
               </div>

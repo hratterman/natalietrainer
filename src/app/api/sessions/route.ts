@@ -13,6 +13,7 @@ const createSessionSchema = z.object({
     questionCount: z.number().int().min(1).max(30),
     personaId: z.string().nullable().default(null),
     secondsPerQuestion: z.number().int().min(10).max(600).nullable().default(null),
+    voiceMode: z.boolean().default(false),
     rounds: z
       .array(
         z.object({
