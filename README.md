@@ -12,6 +12,7 @@ An investment banking technical-interview trainer built for superday prep. It ge
   - **Superday simulation** — four rounds, four interviewer personas, one overall debrief.
 - **Honest scoring**: accuracy / completeness / structure rubrics with model answers and specific corrections; 80+ means offer-quality.
 - **Progress tracking**: a mastery heatmap over every subtopic, adaptive difficulty, weakness surfacing, and prescribed drill plans after every session.
+- **PIN login + onboarding**: a built-in PIN gate (`APP_PIN`, default 1234) covers every page and API route, and a first-visit welcome card + spotlight tour walks the dashboard.
 
 ## Setup
 
@@ -23,7 +24,7 @@ cp .env.example .env.local   # then put your Anthropic API key in it
 npm run dev
 ```
 
-Open http://localhost:3000. The SQLite database self-creates at `data/natalie.db` on first use.
+Open http://localhost:3000. You'll be asked for a PIN — the default is **1234**; set your own with `APP_PIN` in `.env.local` (restart to apply). The SQLite database self-creates at `data/natalie.db` on first use. The first visit after logging in offers a guided tour of the dashboard — relaunch it anytime with the Tour button.
 
 Questions, interviewing, and grading run on the Claude API (`claude-opus-5`), so `ANTHROPIC_API_KEY` is required for real sessions. To try the app without a key (canned questions and grades), set `LLM_MOCK=1` in `.env.local`.
 

@@ -6,15 +6,21 @@ import { usePathname } from "next/navigation";
 /** Nav item with an active state: current section gets full ink + underline. */
 export function NavLink({
   href,
+  match,
   exact = false,
   children,
 }: {
   href: string;
+  /** Path prefix that counts as "in this section" (defaults to href). */
+  match?: string;
   exact?: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const active = exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
+  const section = match ?? href;
+  const active = exact
+    ? pathname === href
+    : pathname === section || pathname.startsWith(`${section}/`);
   return (
     <Link
       href={href}
