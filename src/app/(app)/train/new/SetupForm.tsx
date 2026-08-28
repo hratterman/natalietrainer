@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CheckCircleIcon, MicIcon } from "@/components/ui/icons";
 
 export type SetupTaxonomy = {
   areas: {
@@ -149,6 +150,22 @@ export function SetupForm({
     !starting &&
     (mode === "drill" ? subtopicIds.length > 0 : mode === "superday" ? true : areaIds.length > 0);
 
+  const modeTitle = MODE_CARDS.find((c) => c.mode === mode)?.title ?? mode;
+  const voiceOn = mode !== "rapid" && voiceAvailable && voiceMode;
+  const summaryLine =
+    mode === "superday"
+      ? `${modeTitle} · 4 rounds · 12 questions${voiceOn ? " · voice on" : ""}`
+      : [
+          modeTitle,
+          mode === "drill"
+            ? `${subtopicIds.length} subtopic${subtopicIds.length === 1 ? "" : "s"}`
+            : `${areaIds.length} area${areaIds.length === 1 ? "" : "s"}`,
+          `${clampInt(questionCount, 1, 30, mode === "rapid" ? 10 : 5)} questions`,
+          difficulty === "adaptive" ? "adaptive difficulty" : `difficulty ${difficulty}`,
+          ...(mode === "rapid" ? [`${clampInt(secondsPerQuestion, 10, 600, 45)}s each`] : []),
+          ...(voiceOn ? ["voice on"] : []),
+        ].join(" · ");
+
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="text-2xl font-bold tracking-tight text-ink-900">New session</h1>
@@ -165,7 +182,10 @@ export function SetupForm({
                 : "border-line bg-surface-1 hover:border-line-strong"
             }`}
           >
-            <div className="font-semibold text-ink-900">{card.title}</div>
+            <div className="flex items-center justify-between font-semibold text-ink-900">
+              {card.title}
+              {mode === card.mode && <CheckCircleIcon className="h-4 w-4 text-primary" />}
+            </div>
             <div className="mt-1 text-sm text-ink-600">{card.blurb}</div>
           </button>
         ))}
@@ -176,6 +196,8 @@ export function SetupForm({
         <button
           onClick={() => voiceAvailable && setVoiceMode((v) => !v)}
           disabled={!voiceAvailable}
+          role="switch"
+          aria-checked={voiceMode && voiceAvailable}
           data-voice-on={voiceMode && voiceAvailable ? "true" : "false"}
           className={`mt-4 flex w-full items-center justify-between rounded-lg border p-4 text-left transition ${
             voiceMode && voiceAvailable
@@ -184,7 +206,9 @@ export function SetupForm({
           } ${voiceAvailable ? "hover:border-line-strong" : "cursor-not-allowed opacity-60"}`}
         >
           <div>
-            <div className="font-semibold text-ink-900">🎙 Voice interview</div>
+            <div className="flex items-center gap-1.5 font-semibold text-ink-900">
+              <MicIcon className="h-4 w-4 text-primary" /> Voice interview
+            </div>
             <div className="mt-1 text-sm text-ink-600">
               {voiceAvailable
                 ? "Speak your answers out loud to an interviewer with a real voice. Silence ends your turn — no editing, like the real thing."
@@ -228,7 +252,7 @@ export function SetupForm({
                           type="checkbox"
                           checked={subtopicIds.includes(s.id)}
                           onChange={() => toggle(subtopicIds, setSubtopicIds, s.id)}
-                          className="accent-indigo-500"
+                          className="accent-primary"
                         />
                         {s.name}
                       </label>
@@ -250,7 +274,7 @@ export function SetupForm({
                     type="checkbox"
                     checked={areaIds.includes(area.id)}
                     onChange={() => toggle(areaIds, setAreaIds, area.id)}
-                    className="accent-indigo-500"
+                    className="accent-primary"
                   />
                   {area.name}
                   {area.tier === 1 && (
@@ -367,10 +391,18 @@ export function SetupForm({
 
       {error && <p className="mt-4 text-sm text-bad">{error}</p>}
 
+      <div className="mt-6 flex items-center justify-between gap-4">
+        <p className="text-sm text-ink-600">{summaryLine}</p>
+        {!canStart && !starting && (
+          <p className="text-sm font-medium text-warn">
+            {mode === "drill" ? "Pick at least one subtopic first" : "Pick at least one area first"}
+          </p>
+        )}
+      </div>
       <button
         onClick={() => void start()}
         disabled={!canStart}
-        className="mt-6 w-full rounded bg-primary px-4 py-3 text-sm font-semibold hover:bg-primary disabled:cursor-not-allowed disabled:opacity-40"
+        className="btn btn-primary mt-3 w-full py-3"
       >
         {starting ? "Writing your first question…" : "Start session"}
       </button>

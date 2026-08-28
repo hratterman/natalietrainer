@@ -45,7 +45,7 @@ export function GradeCard({
       </div>
 
       {learnHref && (
-        <Link href={learnHref} className="btn btn-primary mt-4 w-full">
+        <Link href={learnHref} className="btn btn-secondary mt-4 w-full">
           Learn this properly with the coach →
         </Link>
       )}
@@ -61,11 +61,8 @@ export function GradeCard({
         <FeedbackList title="Delivery" items={grade.deliveryFeedback} tier="ok" />
       )}
 
-      <button
-        onClick={() => setShowModel((v) => !v)}
-        className="mt-4 text-sm font-medium text-primary hover:text-primary-strong"
-      >
-        {showModel ? "Hide model answer" : "Show model answer"}
+      <button onClick={() => setShowModel((v) => !v)} className="btn btn-ghost btn-sm mt-4 -ml-2">
+        {showModel ? "Hide model answer" : "Show model answer"} {showModel ? "▴" : "▾"}
       </button>
       {showModel && (
         <div className="mt-2 whitespace-pre-wrap rounded-control border border-line bg-surface-2 p-3 text-sm leading-relaxed text-ink-900">

@@ -7,6 +7,7 @@ import { readSseStream } from "@/lib/client/sse";
 import { Bubble as UiBubble } from "./ui/Bubble";
 import { Spinner } from "./ui/Spinner";
 import { useVoiceSession, type SpokenTurnPayload } from "@/lib/voice/useVoiceSession";
+import { CheckCircleIcon, MicIcon } from "./ui/icons";
 
 export type LearnFixitView = {
   id: string;
@@ -429,13 +430,10 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       {initial.voiceAvailable && (phase === "lesson" || phase === "proving") && (
         <button
           onClick={() => void toggleVoice()}
-          className={`shrink-0 rounded px-3 py-1.5 text-xs font-semibold ${
-            voiceOn
-              ? "bg-primary text-white hover:bg-primary"
-              : "bg-surface-2 text-ink-900 hover:bg-line"
-          }`}
+          className={`btn btn-sm shrink-0 ${voiceOn ? "btn-primary" : "btn-secondary"}`}
         >
-          {voiceOn ? "🎙 Voice on" : "🎙 Talk it through"}
+          <MicIcon />
+          {voiceOn ? "Voice on" : "Talk it through"}
         </button>
       )}
     </div>
@@ -500,7 +498,9 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             </>
           ) : cleared ? (
             <>
-              <h2 className="font-semibold text-good">Cleared for good 🎉</h2>
+              <h2 className="flex items-center gap-1.5 font-semibold text-good">
+                <CheckCircleIcon /> Cleared for good
+              </h2>
               <p className="mt-1 text-sm text-ink-900">
                 You&apos;ve proven this twice over spaced checks. It&apos;s out of your queue.
               </p>
@@ -535,6 +535,16 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
               ? "Spot-check — one question, cold."
               : `Prove it: ${passes}/${initial.proofTarget} passed${passes > 0 ? " in a row" : ""}`}
           </span>
+          {initial.kind !== "spotcheck" && (
+            <span className="flex items-center gap-1.5" aria-hidden>
+              {Array.from({ length: initial.proofTarget }, (_, i) => (
+                <span
+                  key={i}
+                  className={`h-2.5 w-2.5 rounded-full ${i < passes ? "bg-good" : "border border-line-strong bg-surface-2"}`}
+                />
+              ))}
+            </span>
+          )}
         </div>
         <div className="card card-pad">
           <p className="whitespace-pre-wrap text-base leading-relaxed text-ink-900">{proof.promptText}</p>
@@ -703,7 +713,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             <button
               onClick={() => void startCheck()}
               disabled={busy}
-              className="text-xs font-medium text-ink-400 hover:text-ink-900 disabled:opacity-40"
+              className="btn btn-secondary btn-sm"
             >
               I&apos;m ready — test me
             </button>

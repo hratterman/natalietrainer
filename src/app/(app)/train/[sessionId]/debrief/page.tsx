@@ -37,17 +37,24 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
       {debrief ? (
         <>
           {/* Overall */}
-          <div className="mt-6 flex items-center gap-5 card card-pad">
+          <div className="mt-6 flex items-center gap-6 card p-6">
             <ScoreBadge overall={debrief.overallScore} size="lg" />
             <div>
-              <div className="text-sm text-ink-600">Superday readiness on this material</div>
-              <div className="text-lg font-semibold text-ink-900">
+              <div className="section-label">Superday readiness on this material</div>
+              <div className="mt-0.5 text-2xl font-bold tracking-tight text-ink-900">
                 {debrief.overallScore >= 80
                   ? "Offer-quality"
                   : debrief.overallScore >= 60
                     ? "Close — sharpen the gaps below"
                     : "Not yet — drill the plan below"}
               </div>
+              <p className="mt-1 text-sm text-ink-600">
+                {debrief.overallScore >= 80
+                  ? "This is the level that gets callbacks. Keep it warm."
+                  : debrief.overallScore >= 60
+                    ? "The mechanics are there; the misses below are what a superday would catch."
+                    : "Work the prescribed drills before re-testing at this difficulty."}
+              </p>
             </div>
           </div>
 
@@ -140,7 +147,9 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
               <span>
                 Q{q.askedIndex + 1} · {subtopicName(q.subtopicId)} · difficulty {q.difficulty}
               </span>
-              <span className="uppercase">{q.status}</span>
+              <span className="rounded-full border border-line bg-surface-2 px-2 py-0.5 uppercase tracking-wide">
+                {q.status}
+              </span>
             </div>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-900">
               {q.promptText}

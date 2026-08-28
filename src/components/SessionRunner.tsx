@@ -750,36 +750,45 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
         </div>
       )}
       {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div className="text-sm text-ink-600">
-          <span className="font-semibold text-ink-900 capitalize">{modeLabel(mode)}</span>
-          {currentRound && roundIndex !== null && (
+      <div className="mb-6">
+        <div className="flex items-center justify-between gap-4">
+          <div className="text-sm text-ink-600">
+            <span className="font-semibold text-ink-900 capitalize">{modeLabel(mode)}</span>
+            {currentRound && roundIndex !== null && (
+              <span>
+                {" "}
+                · Round {roundIndex + 1}/{session.configJson.rounds?.length} —{" "}
+                {initial.areaNames[currentRound.focusAreaId] ?? currentRound.focusAreaId}
+              </span>
+            )}
+            {voiceActive && personaName && <span> · with {personaName}</span>}
             <span>
               {" "}
-              · Round {roundIndex + 1}/{session.configJson.rounds?.length} —{" "}
-              {initial.areaNames[currentRound.focusAreaId] ?? currentRound.focusAreaId}
+              · Question {Math.min(answeredCount + 1, totalQuestions)}/{totalQuestions}
             </span>
+            <span> · {initial.subtopicNames[question.subtopicId] ?? question.subtopicId}</span>
+          </div>
+          {mode === "rapid" && session.configJson.secondsPerQuestion ? (
+            <CountdownTimer
+              key={question.id}
+              seconds={session.configJson.secondsPerQuestion}
+              running={phase === "answering"}
+              onExpire={onRapidExpire}
+            />
+          ) : (
+            <CountUpTimer
+              key={question.id}
+              running={phase === "answering" || phase === "streaming" || phase === "listening"}
+            />
           )}
-          {voiceActive && personaName && <span> · with {personaName}</span>}
-          <span>
-            {" "}
-            · Question {Math.min(answeredCount + 1, totalQuestions)}/{totalQuestions}
-          </span>
-          <span> · {initial.subtopicNames[question.subtopicId] ?? question.subtopicId}</span>
         </div>
-        {mode === "rapid" && session.configJson.secondsPerQuestion ? (
-          <CountdownTimer
-            key={question.id}
-            seconds={session.configJson.secondsPerQuestion}
-            running={phase === "answering"}
-            onExpire={onRapidExpire}
+        {/* Session progress */}
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-surface-2" aria-hidden>
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-300"
+            style={{ width: `${Math.min(100, (answeredCount / totalQuestions) * 100)}%` }}
           />
-        ) : (
-          <CountUpTimer
-            key={question.id}
-            running={phase === "answering" || phase === "streaming" || phase === "listening"}
-          />
-        )}
+        </div>
       </div>
 
       {/* Question card (voice mode shows it as reference after the opening is spoken) */}
@@ -808,7 +817,7 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       {/* Interviewer speaking / streaming */}
       {(phase === "streaming" || phase === "interviewerSpeaking") && (
         <div className="mt-3 flex justify-start">
-          <div className="max-w-[85%] rounded-lg border border-line-strong bg-surface-2 px-4 py-2.5 text-sm leading-relaxed text-ink-900 whitespace-pre-wrap">
+          <div className="max-w-[85%] rounded-card border border-line bg-surface-1 px-4 py-2.5 text-sm leading-relaxed text-ink-900 whitespace-pre-wrap">
             <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-ink-400">
               {personaName ?? "Interviewer"}
               {voiceActive && <SpeakingDots />}
@@ -930,28 +939,23 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
             >
               Submit answer
             </button>
-            <button
-              onClick={() => void complete()}
-              className="text-xs font-medium text-ink-400 hover:text-ink-900"
-            >
-              End session early
-            </button>
           </div>
-          {mode !== "rapid" && (
-            <p className="text-xs text-ink-400">Follow-ups allowed on this question: {followUpCap}</p>
-          )}
         </div>
       )}
 
-      {/* Voice-mode footer actions */}
-      {voiceActive && (phase === "listening" || phase === "interviewerSpeaking") && (
-        <div className="mt-4 flex items-center justify-between text-xs text-ink-400">
-          <span>{phase === "listening" ? "You can interrupt the interviewer by speaking." : ""}</span>
-          <button onClick={() => void complete()} className="hover:text-ink-900">
-            End session early
-          </button>
-        </div>
-      )}
+      {/* Session footer: the same quiet exit in every phase, always bottom-right. */}
+      <div className="mt-6 flex items-center justify-between border-t border-line pt-3 text-xs text-ink-400">
+        <span>
+          {voiceActive && phase === "listening"
+            ? "You can interrupt the interviewer by speaking."
+            : mode !== "rapid" && phase === "answering"
+              ? `Follow-ups allowed on this question: ${followUpCap}`
+              : ""}
+        </span>
+        <button onClick={() => void complete()} className="font-medium hover:text-ink-900">
+          End session early
+        </button>
+      </div>
     </div>
   );
 }
