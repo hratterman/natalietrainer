@@ -170,6 +170,7 @@ export function SetupForm({
         <button
           onClick={() => voiceAvailable && setVoiceMode((v) => !v)}
           disabled={!voiceAvailable}
+          data-voice-on={voiceMode && voiceAvailable ? "true" : "false"}
           className={`mt-4 flex w-full items-center justify-between rounded-lg border p-4 text-left transition ${
             voiceMode && voiceAvailable
               ? "border-indigo-500 bg-indigo-500/10"
