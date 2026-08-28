@@ -17,6 +17,18 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     if (!question || question.sessionId !== sessionId) {
       return NextResponse.json({ error: "Question not found in this session." }, { status: 404 });
     }
+    const session = repo.getSession(sessionId);
+    if (
+      session?.mode === "learn" &&
+      question.askedIndex === 0 &&
+      session.configJson.spotCheck !== true
+    ) {
+      // The lesson anchor is coach conversation, never a gradable answer.
+      return NextResponse.json(
+        { error: "Lesson anchors are not graded — answer a proof question instead." },
+        { status: 409 },
+      );
+    }
     const turns = repo.getTurns(question.id);
     if (!turns.some((t) => t.role === "candidate")) {
       return NextResponse.json(

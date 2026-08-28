@@ -11,6 +11,12 @@ export async function POST(_request: Request, ctx: { params: Promise<{ id: strin
     if (session.status === "completed" && session.debriefJson) {
       return NextResponse.json({ debrief: session.debriefJson });
     }
+    if (session.mode === "learn") {
+      return NextResponse.json(
+        { error: "Learn sessions are completed by the fix-it lifecycle, not this route." },
+        { status: 409 },
+      );
+    }
     const debrief = await completeSession(sessionId);
     return NextResponse.json({ debrief });
   } catch (err) {

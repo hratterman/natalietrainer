@@ -19,10 +19,28 @@ import type { NextQuestionResult } from "./engine";
  * pipeline. Learn sessions never run completeSession.
  */
 
-/** Create the lesson session + anchor question for a fixit (idempotent per fixit). */
+/**
+ * Repoint a fixit's lesson session, abandoning any still-active predecessor so
+ * a stranded session can never hijack resume flows later.
+ */
+function repointLessonSession(fixit: repo.FixitRow, newSessionId: string): void {
+  if (fixit.lessonSessionId && fixit.lessonSessionId !== newSessionId) {
+    const prior = repo.getSession(fixit.lessonSessionId);
+    if (prior && prior.status === "active") {
+      repo.updateSessionStatus(prior.id, "abandoned");
+    }
+  }
+  repo.setFixitLessonSession(fixit.id, newSessionId);
+}
+
+/**
+ * Create the lesson session + anchor question for a fixit (idempotent per fixit).
+ * `voiceMode` undefined means "don't touch" — a bare resume never resets an
+ * existing lesson's voice setting.
+ */
 export function startLesson(
   fixit: repo.FixitRow,
-  voiceMode = false,
+  voiceMode?: boolean,
 ): { session: repo.SessionRow; anchor: repo.QuestionRow } {
   // Resume an active lesson if one exists.
   if (fixit.lessonSessionId) {
@@ -32,7 +50,7 @@ export function startLesson(
         .getSessionQuestions(existing.id)
         .find((q) => q.askedIndex === 0);
       if (anchor) {
-        if ((existing.configJson.voiceMode === true) !== voiceMode) {
+        if (voiceMode !== undefined && (existing.configJson.voiceMode === true) !== voiceMode) {
           repo.setSessionVoiceMode(existing.id, voiceMode);
           existing.configJson.voiceMode = voiceMode;
         }
@@ -55,7 +73,7 @@ export function startLesson(
       secondsPerQuestion: null,
       rounds: null,
       fixitId: fixit.id,
-      voiceMode,
+      voiceMode: voiceMode === true,
     },
   });
   // Anchor: a verbatim copy of the missed question. Never graded; the coach
@@ -72,13 +90,18 @@ export function startLesson(
     expectedKeyPoints: source.expectedKeyPointsJson,
     answerFormat: source.answerFormat,
   });
-  repo.setFixitLessonSession(fixit.id, session.id);
+  repointLessonSession(fixit, session.id);
   return { session, anchor };
 }
 
-/** Create a 1-question spot-check session for a due fixit. */
+/**
+ * Create a 1-question spot-check session for a resolved fixit. `early` marks a
+ * check taken ahead of its scheduled date: a pass then leaves the spaced
+ * schedule untouched (a fail always reopens).
+ */
 export async function startSpotCheck(
   fixit: repo.FixitRow,
+  opts: { early?: boolean } = {},
 ): Promise<{ session: repo.SessionRow; question: repo.QuestionRow }> {
   const session = repo.createSession({
     mode: "learn",
@@ -92,9 +115,10 @@ export async function startSpotCheck(
       rounds: null,
       fixitId: fixit.id,
       spotCheck: true,
+      early: opts.early === true,
     },
   });
-  repo.setFixitLessonSession(fixit.id, session.id);
+  repointLessonSession(fixit, session.id);
   const question = await generateProofQuestion(session, fixit, 0);
   return { session, question };
 }
@@ -189,11 +213,15 @@ export function onLearnQuestionGraded(
 
   if (isSpotCheck) {
     if (passed) {
-      const transition = afterSpotCheck(fixit.checkStage, true, now);
-      if (transition.kind === "cleared") {
-        repo.advanceFixitCheck(fixit.id, fixit.checkStage + 1, null);
-      } else if (transition.kind === "advance") {
-        repo.advanceFixitCheck(fixit.id, transition.checkStage, transition.nextCheckAt);
+      // An early check that passes proves nothing new about retention over
+      // time — keep the existing spaced schedule instead of advancing it.
+      if (session.configJson.early !== true) {
+        const transition = afterSpotCheck(fixit.checkStage, true, now);
+        if (transition.kind === "cleared") {
+          repo.advanceFixitCheck(fixit.id, fixit.checkStage + 1, null);
+        } else if (transition.kind === "advance") {
+          repo.advanceFixitCheck(fixit.id, transition.checkStage, transition.nextCheckAt);
+        }
       }
     } else {
       const subtopicName = getSubtopic(question.subtopicId)?.subtopic.name ?? question.subtopicId;

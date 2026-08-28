@@ -230,7 +230,8 @@ describe("learn loop (LLM_MOCK)", () => {
     expect(repo.getFixit(fixitId!)!.status).toBe("resolved");
     expect(repo.getFixit(fixitId!)!.checkStage).toBe(0);
 
-    // Spot-check #1: pass → stage 1, later date.
+    // Spot-check #1 (due — backdate the schedule): pass → stage 1, later date.
+    repo.advanceFixitCheck(fixitId!, 0, new Date(Date.now() - 60_000));
     const sc1 = await spotcheck(new Request("http://test", { method: "POST" }), ctx(fixitId!));
     const sc1Body = (await sc1.json()) as { sessionId: string; question: { id: string } };
     await answerProof(sc1Body.sessionId, sc1Body.question.id, PASS_ANSWER);
@@ -240,7 +241,8 @@ describe("learn loop (LLM_MOCK)", () => {
     expect(f.nextCheckAt!.getTime()).toBeGreaterThan(Date.now() + 6 * 24 * 3600 * 1000);
     expect(repo.getSession(sc1Body.sessionId)?.status).toBe("completed");
 
-    // Spot-check #2: pass → cleared.
+    // Spot-check #2 (due): pass → cleared.
+    repo.advanceFixitCheck(fixitId!, 1, new Date(Date.now() - 60_000));
     const sc2 = await spotcheck(new Request("http://test", { method: "POST" }), ctx(fixitId!));
     const sc2Body = (await sc2.json()) as { sessionId: string; question: { id: string } };
     await answerProof(sc2Body.sessionId, sc2Body.question.id, PASS_ANSWER);

@@ -6,19 +6,22 @@ import { interviewerTurn } from "@/lib/llm/interviewer";
 import { computeDeliveryMetrics } from "@/lib/voice/deliveryMetrics";
 import { errorResponse, parseBody } from "@/lib/api/validate";
 
+/** One day — nothing in a session legitimately runs longer. */
+const MAX_DURATION_MS = 86_400_000;
+
 const answerSchema = z.object({
   questionId: z.string(),
-  answer: z.string().min(1),
-  scratchpad: z.string().nullable().optional(),
-  elapsedMs: z.number().int().min(0).nullable().optional(),
+  answer: z.string().min(1).max(20_000),
+  scratchpad: z.string().max(20_000).nullable().optional(),
+  elapsedMs: z.number().int().min(0).max(MAX_DURATION_MS).nullable().optional(),
   /** Spoken answers: client-measured timing + interruption context. */
   voice: z
     .object({
-      audioDurationMs: z.number().int().min(0),
-      pausesMs: z.array(z.number().int().min(0)).max(100),
+      audioDurationMs: z.number().int().min(0).max(MAX_DURATION_MS),
+      pausesMs: z.array(z.number().int().min(0).max(MAX_DURATION_MS)).max(100),
       bargeIn: z.boolean(),
       /** How many chars of the previous interviewer reply she actually heard. */
-      heardChars: z.number().int().min(0).optional(),
+      heardChars: z.number().int().min(0).max(1_000_000).optional(),
     })
     .nullable()
     .optional(),
@@ -74,8 +77,15 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
-        const send = (data: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        // Never let a disconnected client abort persistence: enqueue throws once
+        // the reader cancels, but the interviewer turn + status must still land.
+        const send = (data: unknown) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            /* client went away — keep going, persistence below still matters */
+          }
+        };
         try {
           const gen = interviewerTurn({
             mode: session.mode,
@@ -85,7 +95,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
             answer: body.data.answer,
             scratchpad: body.data.scratchpad ?? null,
             forceWrapup,
-            voice: session.configJson.voiceMode === true,
+            voice: voice != null,
           });
           let result = await gen.next();
           while (!result.done) {
@@ -98,8 +108,12 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
             role: "interviewer",
             content: spoken,
           });
+          // Only active → answered; a concurrent grade may already have moved it on.
+          const current = repo.getQuestion(question.id);
+          if (action === "wrapup" && current?.status === "active") {
+            repo.updateQuestionStatus(question.id, "answered");
+          }
           const questionStatus = action === "wrapup" ? "answered" : "active";
-          if (action === "wrapup") repo.updateQuestionStatus(question.id, "answered");
           send({ type: "done", action, questionStatus });
         } catch (err) {
           send({
@@ -107,7 +121,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
             error: err instanceof Error ? err.message : "Interviewer turn failed.",
           });
         } finally {
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            /* already closed/cancelled */
+          }
         }
       },
     });

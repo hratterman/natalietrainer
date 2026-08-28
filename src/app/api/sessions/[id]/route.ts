@@ -13,10 +13,15 @@ export async function GET(_request: Request, ctx: { params: Promise<{ id: string
       return NextResponse.json({ error: "Session not found." }, { status: 404 });
     }
     const active = repo.getActiveQuestion(id);
+    // Never ship the answer key for questions that haven't been graded yet —
+    // summary + expected key points would be a cheat sheet in the network tab.
+    const questions = state.questions.map((q) =>
+      q.grade ? q : { ...q, summary: "", expectedKeyPointsJson: [] },
+    );
     return NextResponse.json({
       session: state.session,
       rounds: state.rounds,
-      questions: state.questions,
+      questions,
       activeQuestionId: active?.id ?? null,
       followUpCap: FOLLOW_UP_CAPS[state.session.mode],
     });

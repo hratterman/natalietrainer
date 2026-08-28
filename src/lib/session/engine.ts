@@ -100,10 +100,30 @@ export type NextQuestionResult =
   | { done: false; question: repo.QuestionRow; roundIndex: number | null };
 
 /**
- * Generate and persist the next question for a session, or report the session
- * is out of questions. No-op if a question is already active.
+ * In-flight de-duplication: concurrent nextQuestion/completeSession calls for
+ * the same session (double-click, two tabs) share one promise instead of
+ * interleaving at LLM awaits and creating duplicate questions/debriefs.
  */
-export async function nextQuestion(sessionId: string): Promise<NextQuestionResult> {
+const inFlight = new Map<string, Promise<unknown>>();
+
+function dedupeInFlight<T>(key: string, run: () => Promise<T>): Promise<T> {
+  const existing = inFlight.get(key);
+  if (existing) return existing as Promise<T>;
+  const promise = run().finally(() => inFlight.delete(key));
+  inFlight.set(key, promise);
+  return promise;
+}
+
+/**
+ * Generate and persist the next question for a session, or report the session
+ * is out of questions. No-op if a question is already active. Concurrent
+ * calls for one session coalesce.
+ */
+export function nextQuestion(sessionId: string): Promise<NextQuestionResult> {
+  return dedupeInFlight(`next:${sessionId}`, () => nextQuestionInner(sessionId));
+}
+
+async function nextQuestionInner(sessionId: string): Promise<NextQuestionResult> {
   const session = repo.getSession(sessionId);
   if (!session) throw new Error(`session ${sessionId} not found`);
   if (session.mode === "learn") {
@@ -151,6 +171,17 @@ export async function nextQuestion(sessionId: string): Promise<NextQuestionResul
     recentSummaries: repo.getRecentQuestionSummaries(target.subtopicId),
   });
 
+  // Re-check after the LLM await: another request may have raced past the
+  // in-flight lock boundary (e.g. an older deploy) or a question landed some
+  // other way — never leave two active questions.
+  const nowActive = repo.getActiveQuestion(sessionId);
+  if (nowActive) {
+    const round = nowActive.roundId
+      ? repo.getRounds(sessionId).find((r) => r.id === nowActive.roundId)
+      : undefined;
+    return { done: false, question: nowActive, roundIndex: round?.roundIndex ?? null };
+  }
+
   const question = repo.createQuestion({
     sessionId,
     roundId,
@@ -167,10 +198,23 @@ export async function nextQuestion(sessionId: string): Promise<NextQuestionResul
   return { done: false, question, roundIndex };
 }
 
-/** Create a session and seed its first question (or full rapid batch). */
+/**
+ * Create a session and seed its first question (or full rapid batch). If
+ * seeding fails, the session is marked abandoned so it can never surface as
+ * an unfinishable "resume me" ghost.
+ */
 export async function startSession(mode: Mode, config: SessionConfig): Promise<repo.SessionRow> {
   const session = repo.createSession({ mode, config });
+  try {
+    await seedSession(session.id, mode, config);
+  } catch (err) {
+    repo.updateSessionStatus(session.id, "abandoned");
+    throw err;
+  }
+  return repo.getSession(session.id)!;
+}
 
+async function seedSession(sessionId: string, mode: Mode, config: SessionConfig): Promise<void> {
   if (mode === "rapid") {
     const scope = subtopicsInScope(config);
     const recent = scope.flatMap((s) => repo.getRecentQuestionSummaries(s, 5));
@@ -184,7 +228,7 @@ export async function startSession(mode: Mode, config: SessionConfig): Promise<r
     });
     specs.forEach((spec, i) => {
       repo.createQuestion({
-        sessionId: session.id,
+        sessionId,
         askedIndex: i,
         subtopicId: spec.subtopicId,
         archetypeId: spec.archetypeId,
@@ -197,9 +241,9 @@ export async function startSession(mode: Mode, config: SessionConfig): Promise<r
       });
     });
   } else {
-    await nextQuestion(session.id);
+    const first = await nextQuestion(sessionId);
+    if (first.done) throw new Error("session could not seed a first question");
   }
-  return repo.getSession(session.id)!;
 }
 
 /** The persona actually interviewing this question (superday rounds override the session default). */
@@ -254,24 +298,34 @@ export async function gradeAndRecord(questionId: string): Promise<GradeResult> {
   const question = repo.getQuestion(questionId);
   if (!question) throw new Error(`question ${questionId} not found`);
   const session = repo.getSession(question.sessionId);
-  const voice = session?.configJson.voiceMode === true;
   const turns = repo.getTurns(questionId);
+  // Spoken vs typed is decided per-transcript, not from session config: voice
+  // can drop mid-session, and typed answers must never be delivery-graded.
+  const voice = turns.some((t) => t.role === "candidate" && t.deliveryMetricsJson != null);
   const grade = await gradeQuestion(question, turns, voice);
-  repo.recordGrade({
-    questionId,
-    accuracy: grade.accuracy,
-    completeness: grade.completeness,
-    structure: grade.structure,
-    delivery: voice ? grade.delivery : null,
-    overall: grade.overall,
-    modelAnswer: grade.modelAnswer,
-    feedback: {
-      strengths: grade.strengths,
-      gaps: grade.gaps,
-      corrections: grade.corrections,
-      ...(voice && grade.deliveryFeedback.length > 0 ? { delivery: grade.deliveryFeedback } : {}),
-    },
-  });
+  try {
+    repo.recordGrade({
+      questionId,
+      accuracy: grade.accuracy,
+      completeness: grade.completeness,
+      structure: grade.structure,
+      delivery: voice ? grade.delivery : null,
+      overall: grade.overall,
+      modelAnswer: grade.modelAnswer,
+      feedback: {
+        strengths: grade.strengths,
+        gaps: grade.gaps,
+        corrections: grade.corrections,
+        ...(voice && grade.deliveryFeedback.length > 0 ? { delivery: grade.deliveryFeedback } : {}),
+      },
+    });
+  } catch (err) {
+    // Concurrent grade of the same question: the UNIQUE(questionId) constraint
+    // makes the second insert lose — return the winner's grade instead.
+    const raced = repo.getGrade(questionId);
+    if (!raced) throw err;
+    return gradeAndRecord(questionId);
+  }
 
   let fixitId: string | null = null;
   if (session?.mode === "learn") {
@@ -296,9 +350,26 @@ export async function gradeAndRecord(questionId: string): Promise<GradeResult> {
  * Complete a session: grade any answered-but-ungraded questions (rapid-fire
  * batch grading), mark stragglers skipped, produce and store the debrief.
  */
-export async function completeSession(sessionId: string): Promise<Debrief> {
+export function completeSession(sessionId: string): Promise<Debrief> {
+  return dedupeInFlight(`complete:${sessionId}`, () => completeSessionInner(sessionId));
+}
+
+const EMPTY_DEBRIEF: Debrief = {
+  overallScore: 0,
+  byArea: [],
+  topStrengths: [],
+  topWeaknesses: [],
+  drillPlan: [],
+};
+
+async function completeSessionInner(sessionId: string): Promise<Debrief> {
   const session = repo.getSession(sessionId);
   if (!session) throw new Error(`session ${sessionId} not found`);
+  if (session.mode === "learn") {
+    // Learn sessions close via the fixit lifecycle — grading the lesson's
+    // anchor (the coach chat) would poison mastery.
+    throw new Error("learn sessions are completed by the fixit lifecycle, not /complete");
+  }
 
   for (const q of repo.getSessionQuestions(sessionId)) {
     if (q.status === "answered") {
@@ -314,7 +385,8 @@ export async function completeSession(sessionId: string): Promise<Debrief> {
   }
 
   const graded = repo.getGradesForSession(sessionId);
-  const debrief = await generateDebrief(graded);
+  // Nothing answered: don't ask the LLM to hallucinate a debrief from nothing.
+  const debrief = graded.length === 0 ? EMPTY_DEBRIEF : await generateDebrief(graded);
   repo.saveSessionDebrief(sessionId, debrief);
   return debrief;
 }

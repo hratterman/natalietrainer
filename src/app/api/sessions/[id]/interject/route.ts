@@ -4,15 +4,18 @@ import * as repo from "@/lib/db/repo";
 import { computeDeliveryMetrics } from "@/lib/voice/deliveryMetrics";
 import { errorResponse, parseBody } from "@/lib/api/validate";
 
+/** One day — nothing in a session legitimately runs longer. */
+const MAX_DURATION_MS = 86_400_000;
+
 const interjectSchema = z.object({
   questionId: z.string(),
   /** What she managed to say before being cut off (incl. the grace tail). */
-  answer: z.string(),
-  elapsedMs: z.number().int().min(0).nullable().optional(),
+  answer: z.string().max(20_000),
+  elapsedMs: z.number().int().min(0).max(MAX_DURATION_MS).nullable().optional(),
   voice: z
     .object({
-      audioDurationMs: z.number().int().min(0),
-      pausesMs: z.array(z.number().int().min(0)).max(100),
+      audioDurationMs: z.number().int().min(0).max(MAX_DURATION_MS),
+      pausesMs: z.array(z.number().int().min(0).max(MAX_DURATION_MS)).max(100),
     })
     .nullable()
     .optional(),
@@ -33,6 +36,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const { id: sessionId } = await ctx.params;
     const session = repo.getSession(sessionId);
     if (!session) return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    if (session.configJson.voiceMode !== true || session.mode === "learn") {
+      // Barge-ins only exist in spoken interviewer sessions.
+      return NextResponse.json(
+        { error: "Interjections only apply to voice interview sessions." },
+        { status: 409 },
+      );
+    }
     const question = repo.getQuestion(body.data.questionId);
     if (!question || question.sessionId !== sessionId) {
       return NextResponse.json({ error: "Question not found in this session." }, { status: 404 });

@@ -38,6 +38,8 @@ export type SessionConfig = {
   fixitId?: string;
   /** Learn sessions only: a 1-question spaced spot-check (no lesson/anchor). */
   spotCheck?: boolean;
+  /** Spot-checks only: taken ahead of schedule — a pass keeps the existing spacing. */
+  early?: boolean;
 };
 
 export const sessions = sqliteTable("sessions", {

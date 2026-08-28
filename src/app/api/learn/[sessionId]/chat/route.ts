@@ -26,6 +26,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ sessionId:
     if (session.configJson.spotCheck === true) {
       return NextResponse.json({ error: "Spot-checks have no lesson chat." }, { status: 409 });
     }
+    if (session.status !== "active") {
+      return NextResponse.json({ error: "This lesson is closed." }, { status: 409 });
+    }
     const fixit = session.configJson.fixitId ? repo.getFixit(session.configJson.fixitId) : undefined;
     if (!fixit) return NextResponse.json({ error: "Fixit not found." }, { status: 404 });
 
@@ -53,8 +56,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ sessionId:
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
-        const send = (data: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        const send = (data: unknown) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            /* client went away — persistence below still matters */
+          }
+        };
         try {
           const gen = coachTurn({
             sourceQuestion,
@@ -82,7 +90,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ sessionId:
             error: err instanceof Error ? err.message : "Coach turn failed.",
           });
         } finally {
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            /* already closed/cancelled */
+          }
         }
       },
     });

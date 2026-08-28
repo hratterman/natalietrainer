@@ -5,8 +5,8 @@ import { startLesson } from "@/lib/session/learn";
 import { errorResponse } from "@/lib/api/validate";
 
 const lessonSchema = z.object({
-  /** Spoken lesson (coach voice + mic). */
-  voice: z.boolean().default(false),
+  /** Spoken lesson (coach voice + mic). Omitted = leave the lesson's current setting alone. */
+  voice: z.boolean().optional(),
 });
 
 /** Start (or resume) the coaching lesson for a fixit. Idempotent. */
@@ -15,7 +15,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const { id } = await ctx.params;
     const raw = await request.json().catch(() => ({}));
     const parsed = lessonSchema.safeParse(raw ?? {});
-    const voice = parsed.success ? parsed.data.voice : false;
+    const voice = parsed.success ? parsed.data.voice : undefined;
     const fixit = repo.getFixit(id);
     if (!fixit) return NextResponse.json({ error: "Fixit not found." }, { status: 404 });
     if (fixit.status !== "open") {

@@ -41,8 +41,13 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
     const encoder = new TextEncoder();
     const stream = new ReadableStream<Uint8Array>({
       async start(controller) {
-        const send = (data: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        const send = (data: unknown) => {
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+          } catch {
+            /* client went away — persistence below still matters */
+          }
+        };
         try {
           if (existingOpen) {
             send({ type: "delta", text: existingOpen.content });
@@ -60,11 +65,18 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
             send({ type: "delta", text: result.value });
             result = await gen.next();
           }
-          repo.appendTurn({
-            questionId: question.id,
-            role: "interviewer",
-            content: result.value.spoken,
-          });
+          // A concurrent /open may have persisted the opening while we generated;
+          // never append a second one (it would count as a follow-up).
+          const nowOpen = repo
+            .getTurns(question.id)
+            .find((t) => t.role === "interviewer" && t.turnIndex === 0);
+          if (!nowOpen) {
+            repo.appendTurn({
+              questionId: question.id,
+              role: "interviewer",
+              content: result.value.spoken,
+            });
+          }
           send({ type: "done", action: "ask", questionStatus: question.status });
         } catch (err) {
           send({
@@ -72,7 +84,11 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
             error: err instanceof Error ? err.message : "Question opening failed.",
           });
         } finally {
-          controller.close();
+          try {
+            controller.close();
+          } catch {
+            /* already closed/cancelled */
+          }
         }
       },
     });
