@@ -139,6 +139,117 @@ describe("repo round trip", () => {
     expect(rebuilt?.currentDifficulty).toBe(incremental?.currentDifficulty);
   });
 
+  it("fixit lifecycle: upsert-dedupe, reopen-resolved, new row after cleared", async () => {
+    const repo = await import("./repo");
+    const session = repo.createSession({
+      mode: "drill",
+      config: {
+        subtopicIds: ["dcf.wacc"],
+        areaIds: [],
+        difficulty: 3,
+        questionCount: 3,
+        personaId: null,
+        secondsPerQuestion: null,
+        rounds: null,
+      },
+    });
+    const makeQuestion = (i: number) =>
+      repo.createQuestion({
+        sessionId: session.id,
+        askedIndex: i,
+        subtopicId: "dcf.wacc",
+        archetypeId: "dcf.wacc.beta",
+        difficulty: 3,
+        promptText: `Q${i}`,
+        setupFacts: [],
+        summary: `wacc q${i}`,
+        expectedKeyPoints: [],
+        answerFormat: "walkthrough",
+      });
+
+    const q1 = makeQuestion(0);
+    const first = repo.upsertFixitForMiss({
+      sourceQuestionId: q1.id,
+      subtopicId: "dcf.wacc",
+      archetypeId: "dcf.wacc.beta",
+      difficulty: 3,
+      concept: "unlevering beta",
+      detail: { gaps: ["forgot the tax term"], corrections: [] },
+    });
+    expect(first.status).toBe("open");
+
+    // Second miss on the same archetype refreshes in place — still one fixit.
+    const q2 = makeQuestion(1);
+    const second = repo.upsertFixitForMiss({
+      sourceQuestionId: q2.id,
+      subtopicId: "dcf.wacc",
+      archetypeId: "dcf.wacc.beta",
+      difficulty: 4,
+      concept: "unlevering beta with taxes",
+      detail: { gaps: ["still the tax term"], corrections: [] },
+    });
+    expect(second.id).toBe(first.id);
+    expect(second.sourceQuestionId).toBe(q2.id);
+    expect(second.difficulty).toBe(4);
+    expect(repo.listActiveFixits()).toHaveLength(1);
+
+    // Resolve → pending check; a new miss reopens the SAME fixit.
+    repo.resolveFixit(first.id, Date.now() + 1000);
+    const q3 = makeQuestion(2);
+    const reopened = repo.upsertFixitForMiss({
+      sourceQuestionId: q3.id,
+      subtopicId: "dcf.wacc",
+      archetypeId: "dcf.wacc.beta",
+      difficulty: 3,
+      concept: "unlevering beta",
+      detail: { gaps: [], corrections: [] },
+    });
+    expect(reopened.id).toBe(first.id);
+    expect(reopened.status).toBe("open");
+    expect(reopened.nextCheckAt).toBeNull();
+
+    // Clear it fully → the next miss creates a brand-new fixit.
+    repo.resolveFixit(first.id, Date.now() + 1000);
+    repo.advanceFixitCheck(first.id, 2, null);
+    const q4 = repo.createQuestion({
+      sessionId: session.id,
+      askedIndex: 3,
+      subtopicId: "dcf.wacc",
+      archetypeId: "dcf.wacc.beta",
+      difficulty: 3,
+      promptText: "Q4",
+      setupFacts: [],
+      summary: "wacc q4",
+      expectedKeyPoints: [],
+      answerFormat: "walkthrough",
+    });
+    const fresh = repo.upsertFixitForMiss({
+      sourceQuestionId: q4.id,
+      subtopicId: "dcf.wacc",
+      archetypeId: "dcf.wacc.beta",
+      difficulty: 3,
+      concept: "unlevering beta",
+      detail: { gaps: [], corrections: [] },
+    });
+    expect(fresh.id).not.toBe(first.id);
+
+    // due filter
+    repo.resolveFixit(fresh.id, Date.now() - 1000);
+    expect(repo.listFixits({ dueBefore: Date.now() }).map((f) => f.id)).toContain(fresh.id);
+
+    // reopen with re-anchor
+    repo.reopenFixit(fresh.id, {
+      sourceQuestionId: q1.id,
+      concept: "re-anchored",
+      detail: { gaps: ["new gap"], corrections: [] },
+    });
+    const after = repo.getFixit(fresh.id)!;
+    expect(after.status).toBe("open");
+    expect(after.attempts).toBe(1);
+    expect(after.sourceQuestionId).toBe(q1.id);
+    expect(repo.getFixitBySourceQuestion(q1.id)?.id).toBe(fresh.id);
+  });
+
   it("creates superday rounds from config", async () => {
     const repo = await import("./repo");
     const session = repo.createSession({

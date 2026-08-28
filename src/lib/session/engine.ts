@@ -19,6 +19,7 @@ export const FOLLOW_UP_CAPS: Record<Mode, number> = {
   drill: 1,
   rapid: 0,
   superday: 3,
+  learn: 1,
 };
 
 /** Subtopics in scope for a session config. */

@@ -1,7 +1,10 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
-export const MODES = ["drill", "mock", "rapid", "superday"] as const;
+export const MODES = ["drill", "mock", "rapid", "superday", "learn"] as const;
 export type Mode = (typeof MODES)[number];
+
+/** Modes a user can start from the setup screen. Learn sessions are created only via fixit routes. */
+export const PLAYABLE_MODES = ["drill", "mock", "rapid", "superday"] as const;
 
 export const SESSION_STATUSES = ["active", "completed", "abandoned"] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
@@ -31,6 +34,10 @@ export type SessionConfig = {
     | null;
   /** Spoken interview (mic in, interviewer voice out). Absent on old rows = false. */
   voiceMode?: boolean;
+  /** Learn sessions only: the fixit this lesson/check belongs to. */
+  fixitId?: string;
+  /** Learn sessions only: a 1-question spaced spot-check (no lesson/anchor). */
+  spotCheck?: boolean;
 };
 
 export const sessions = sqliteTable("sessions", {
@@ -136,6 +143,43 @@ export const grades = sqliteTable("grades", {
   modelAnswer: text("model_answer").notNull(),
   feedbackJson: text("feedback_json", { mode: "json" }).$type<GradeFeedback>().notNull(),
   gradedAt: integer("graded_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const FIXIT_STATUSES = ["open", "resolved"] as const;
+export type FixitStatus = (typeof FIXIT_STATUSES)[number];
+
+/**
+ * A missed concept in the fix-it queue. Lifecycle:
+ * open → (lesson + 2 consecutive proof passes) → resolved with nextCheckAt=+2d
+ * → spot-check pass → +7d → spot-check pass → cleared (nextCheckAt=null)
+ * Any spot-check fail reopens it and re-anchors to the failed question.
+ */
+export const fixits = sqliteTable("fixits", {
+  id: text("id").primaryKey(),
+  sourceQuestionId: text("source_question_id")
+    .notNull()
+    .unique()
+    .references(() => questions.id),
+  subtopicId: text("subtopic_id").notNull(),
+  archetypeId: text("archetype_id").notNull(),
+  /** Proofs and spot-checks regenerate at this difficulty. */
+  difficulty: integer("difficulty").notNull(),
+  /** Short label of the concept to relearn. */
+  concept: text("concept").notNull(),
+  detailJson: text("detail_json", { mode: "json" })
+    .$type<{ gaps: string[]; corrections: string[] }>()
+    .notNull(),
+  status: text("status").$type<FixitStatus>().notNull().default("open"),
+  /** Failed proof/spot-check cycles. */
+  attempts: integer("attempts").notNull().default(0),
+  /** 0 = next check is +2d after resolve, 1 = +7d, 2 = cleared. */
+  checkStage: integer("check_stage").notNull().default(0),
+  /** Active/most-recent learn session, for resume + dedupe. */
+  lessonSessionId: text("lesson_session_id"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
+  /** When a resolved fixit is due for a spot-check; null when open or cleared. */
+  nextCheckAt: integer("next_check_at", { mode: "timestamp_ms" }),
 });
 
 /**

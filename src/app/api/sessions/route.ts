@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { MODES } from "@/lib/db/schema";
+import { PLAYABLE_MODES } from "@/lib/db/schema";
 import { startSession } from "@/lib/session/engine";
 import { errorResponse, parseBody } from "@/lib/api/validate";
 
 const createSessionSchema = z.object({
-  mode: z.enum(MODES),
+  mode: z.enum(PLAYABLE_MODES),
   config: z.object({
     subtopicIds: z.array(z.string()).default([]),
     areaIds: z.array(z.string()).default([]),

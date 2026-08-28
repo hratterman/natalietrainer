@@ -13,6 +13,11 @@ export default async function TrainSessionPage({
   const { sessionId } = await params;
   const state = repo.getSessionWithTranscript(sessionId);
   if (!state) notFound();
+  // Learn sessions have their own UI; send resume/history links there.
+  if (state.session.mode === "learn") {
+    redirect(`/learn/${state.session.configJson.fixitId ?? ""}`);
+  }
+  const mode = state.session.mode;
   if (state.session.status === "completed") redirect(`/train/${sessionId}/debrief`);
 
   const active = repo.getActiveQuestion(sessionId);
@@ -20,7 +25,7 @@ export default async function TrainSessionPage({
   const initial: RunnerInitialState = {
     session: {
       id: state.session.id,
-      mode: state.session.mode,
+      mode,
       status: state.session.status,
       configJson: {
         personaId: state.session.configJson.personaId,

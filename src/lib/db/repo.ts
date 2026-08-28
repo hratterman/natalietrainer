@@ -1,13 +1,15 @@
 import "server-only";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lte, or } from "drizzle-orm";
 import { getDb } from "./index";
 import {
+  fixits,
   grades,
   mastery,
   questions,
   rounds,
   sessions,
   turns,
+  type FixitStatus,
   type GradeFeedback,
   type Mode,
   type QuestionStatus,
@@ -331,6 +333,158 @@ export function rebuildMastery(): void {
       })
       .run();
   }
+}
+
+// ---------------- fixits ----------------
+
+export type FixitRow = typeof fixits.$inferSelect;
+
+/**
+ * Record a miss. One fixit per (subtopicId, archetypeId) while not cleared:
+ * an existing open/awaiting-check fixit is refreshed in place (and reopened);
+ * only a truly cleared one gets a new row.
+ */
+export function upsertFixitForMiss(input: {
+  sourceQuestionId: string;
+  subtopicId: string;
+  archetypeId: string;
+  difficulty: number;
+  concept: string;
+  detail: { gaps: string[]; corrections: string[] };
+}): FixitRow {
+  const db = getDb();
+  const existing = db
+    .select()
+    .from(fixits)
+    .where(
+      and(
+        eq(fixits.subtopicId, input.subtopicId),
+        eq(fixits.archetypeId, input.archetypeId),
+        // not cleared: open, or resolved with a pending check
+        or(eq(fixits.status, "open"), isNotNull(fixits.nextCheckAt)),
+      ),
+    )
+    .get();
+  if (existing) {
+    db.update(fixits)
+      .set({
+        sourceQuestionId: input.sourceQuestionId,
+        difficulty: input.difficulty,
+        concept: input.concept,
+        detailJson: input.detail,
+        status: "open",
+        checkStage: 0,
+        resolvedAt: null,
+        nextCheckAt: null,
+      })
+      .where(eq(fixits.id, existing.id))
+      .run();
+    return getFixit(existing.id)!;
+  }
+  const row: typeof fixits.$inferInsert = {
+    id: id(),
+    sourceQuestionId: input.sourceQuestionId,
+    subtopicId: input.subtopicId,
+    archetypeId: input.archetypeId,
+    difficulty: input.difficulty,
+    concept: input.concept,
+    detailJson: input.detail,
+    status: "open",
+    attempts: 0,
+    checkStage: 0,
+    createdAt: new Date(),
+  };
+  db.insert(fixits).values(row).run();
+  return getFixit(row.id)!;
+}
+
+export function getFixit(fixitId: string): FixitRow | undefined {
+  return getDb().select().from(fixits).where(eq(fixits.id, fixitId)).get();
+}
+
+export function getFixitBySourceQuestion(questionId: string): FixitRow | undefined {
+  return getDb().select().from(fixits).where(eq(fixits.sourceQuestionId, questionId)).get();
+}
+
+export function listFixits(filter?: { status?: FixitStatus; dueBefore?: number }): FixitRow[] {
+  const db = getDb();
+  const conditions = [];
+  if (filter?.status) conditions.push(eq(fixits.status, filter.status));
+  if (filter?.dueBefore !== undefined) {
+    conditions.push(
+      and(isNotNull(fixits.nextCheckAt), lte(fixits.nextCheckAt, new Date(filter.dueBefore))),
+    );
+  }
+  return db
+    .select()
+    .from(fixits)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(fixits.createdAt))
+    .all();
+}
+
+/** Fixits still needing attention: open, or resolved with a check pending. */
+export function listActiveFixits(): FixitRow[] {
+  return getDb()
+    .select()
+    .from(fixits)
+    .where(or(eq(fixits.status, "open"), isNotNull(fixits.nextCheckAt)))
+    .orderBy(desc(fixits.createdAt))
+    .all();
+}
+
+export function setFixitLessonSession(fixitId: string, sessionId: string): void {
+  getDb().update(fixits).set({ lessonSessionId: sessionId }).where(eq(fixits.id, fixitId)).run();
+}
+
+export function bumpFixitAttempts(fixitId: string): void {
+  const current = getFixit(fixitId);
+  if (!current) return;
+  getDb().update(fixits).set({ attempts: current.attempts + 1 }).where(eq(fixits.id, fixitId)).run();
+}
+
+export function resolveFixit(fixitId: string, nextCheckAt: number): void {
+  getDb()
+    .update(fixits)
+    .set({
+      status: "resolved",
+      resolvedAt: new Date(),
+      checkStage: 0,
+      nextCheckAt: new Date(nextCheckAt),
+    })
+    .where(eq(fixits.id, fixitId))
+    .run();
+}
+
+export function advanceFixitCheck(fixitId: string, checkStage: number, nextCheckAt: number | null): void {
+  getDb()
+    .update(fixits)
+    .set({ checkStage, nextCheckAt: nextCheckAt !== null ? new Date(nextCheckAt) : null })
+    .where(eq(fixits.id, fixitId))
+    .run();
+}
+
+/** Spot-check failed: back to open, re-anchored to the freshest missed question. */
+export function reopenFixit(
+  fixitId: string,
+  reanchor: { sourceQuestionId: string; concept: string; detail: { gaps: string[]; corrections: string[] } },
+): void {
+  const current = getFixit(fixitId);
+  if (!current) return;
+  getDb()
+    .update(fixits)
+    .set({
+      status: "open",
+      resolvedAt: null,
+      nextCheckAt: null,
+      checkStage: 0,
+      attempts: current.attempts + 1,
+      sourceQuestionId: reanchor.sourceQuestionId,
+      concept: reanchor.concept,
+      detailJson: reanchor.detail,
+    })
+    .where(eq(fixits.id, fixitId))
+    .run();
 }
 
 export type SessionWithTranscript = {
