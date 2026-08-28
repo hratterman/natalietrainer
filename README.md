@@ -59,6 +59,7 @@ Getting a question wrong isn't a dead end. Every meaningful miss (below 70 overa
 - **Socratic coach**: open a fix-it and a private coach — anchored to the exact question, *your* exact answer, and the grader's corrections — teaches it properly: quotes what you said, starts from what you got right, and makes you do the reasoning one step at a time. Ask it anything.
 - **Prove it to close**: no credit for nodding along. When you (or the coach) think you've got it, you must beat **two fresh questions of the same archetype in a row**, graded cold by the normal grader (they feed your mastery too). Fail one and you're back in the lesson — the coach knows exactly what you missed.
 - **Spaced spot-checks**: resolved concepts resurface for a one-question spot-check 2 days later, then 7 days later. Pass both and it's cleared for good; miss one and it reopens with your newest miss as the starting point.
+- **Talk it through**: with voice available, the "🎙 Talk it through" toggle turns the lesson into a spoken conversation — the coach speaks (warm tutor voice, relaxed pacing, never interrupts) and you reason out loud; spoken proof answers get delivery grading too.
 
 ## How it stays hard and fresh
 

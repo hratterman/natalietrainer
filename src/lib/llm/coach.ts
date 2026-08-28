@@ -71,6 +71,7 @@ export async function* coachTurn(input: {
   fixit: FixitRow;
   priorLessonTurns: TurnRow[];
   latestMessage: string | null;
+  voice?: boolean;
 }): AsyncGenerator<string, CoachTurnResult> {
   if (isMock()) {
     const coachTurnsSoFar = input.priorLessonTurns.filter((t) => t.role === "interviewer").length;
@@ -84,7 +85,7 @@ export async function* coachTurn(input: {
   }
 
   const stream = streamText({
-    system: coachSystem(),
+    system: coachSystem(input.voice ?? false),
     effort: "medium",
     messages: buildCoachMessages(input),
   });

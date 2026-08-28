@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import * as repo from "@/lib/db/repo";
 import { fixitView } from "@/lib/api/fixitView";
 import { PROOF_PASSES_REQUIRED } from "@/lib/fixit";
+import { voiceAvailable } from "@/lib/voice/openai";
 import {
   LearnRunner,
   type LearnChatTurn,
@@ -98,6 +99,8 @@ export default async function LearnPage({ params, searchParams }: PageProps<"/le
     kind,
     resume,
     proofTarget: PROOF_PASSES_REQUIRED,
+    voiceAvailable: voiceAvailable(),
+    voiceFake: process.env.VOICE_FAKE === "1",
   };
 
   return <LearnRunner initial={initial} />;

@@ -21,6 +21,8 @@ export type Persona = {
   id: string;
   name: string;
   blurb: string;
+  /** Not offered as an interviewer in setup (e.g. the coach). */
+  hidden?: boolean;
   /** System-prompt fragment. Compile-time constant — cache-stable. */
   systemFragment: string;
   voice: PersonaVoice;
@@ -272,5 +274,34 @@ export const PERSONAS: Persona[] = [
 ];
 
 export function getPersona(id: string | null | undefined): Persona {
+  if (id === "coach") return COACH_PERSONA;
   return PERSONAS.find((p) => p.id === id) ?? PERSONAS[0]!;
 }
+
+/**
+ * The coach's voice identity for learn-mode lessons. Not an interviewer:
+ * relaxed silence window, never interrupts, hidden from setup (kept out of
+ * PERSONAS so setup pickers never see it).
+ */
+export const COACH_PERSONA: Persona = {
+  id: "coach",
+  name: "Your Coach",
+  blurb: "Patient, warm, rigorous — the tutor across the table.",
+  hidden: true,
+  systemFragment: "",
+  voice: {
+    ttsVoice: "coral",
+    ttsInstructions:
+      "Warm, patient tutor. Calm unhurried pace, encouraging but precise, like a great teacher working one-on-one.",
+  },
+  greetings: [],
+  silenceDurationMs: 3500,
+  interrupt: {
+    patienceMs: null,
+    rambleCharThreshold: null,
+    stallPauseMs: null,
+    fillerStreakLimit: null,
+    maxInterjectionsPerQuestion: 0,
+    interjections: NO_INTERJECTIONS,
+  },
+};

@@ -63,6 +63,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ sessionId:
             fixit,
             priorLessonTurns,
             latestMessage: body.data.message,
+            voice: session.configJson.voiceMode === true,
           });
           let result = await gen.next();
           while (!result.done) {

@@ -158,8 +158,14 @@ OUTPUT PROTOCOL (strict): Your reply MUST begin with exactly one JSON object on 
 - {"action":"check"} — she is ready; the text after it is a one-or-two line handoff to the check questions (e.g. "Alright, I think you've got it — let's prove it.").
 The first line must contain nothing but the JSON object.`;
 
-export function coachSystem(): SystemBlock[] {
-  return systemBlocks(COACH_PROMPT);
+/** Spoken-register rules for voice lessons — appended only in voice mode. */
+const COACH_VOICE_BLOCK = `VOICE: Everything you say is spoken aloud through text-to-speech. Speak like a tutor sitting across the table:
+- Contractions, short natural sentences. No lists, headings, markdown, or stage directions — only words you would say.
+- Say numbers the way a person says them out loud ("seven fifty", "ten percent").
+- One idea, then hand it back — spoken lessons need even shorter turns than written ones.`;
+
+export function coachSystem(voice = false): SystemBlock[] {
+  return systemBlocks(COACH_PROMPT, ...(voice ? [COACH_VOICE_BLOCK] : []));
 }
 
 const DEBRIEF_PROMPT = `You write the post-session debrief for an investment banking interview practice session, calibrated to the analyst superday bar. You are given every question asked, its grade, and its subtopic/area. Synthesize honestly:

@@ -20,7 +20,10 @@ import type { NextQuestionResult } from "./engine";
  */
 
 /** Create the lesson session + anchor question for a fixit (idempotent per fixit). */
-export function startLesson(fixit: repo.FixitRow): { session: repo.SessionRow; anchor: repo.QuestionRow } {
+export function startLesson(
+  fixit: repo.FixitRow,
+  voiceMode = false,
+): { session: repo.SessionRow; anchor: repo.QuestionRow } {
   // Resume an active lesson if one exists.
   if (fixit.lessonSessionId) {
     const existing = repo.getSession(fixit.lessonSessionId);
@@ -28,7 +31,13 @@ export function startLesson(fixit: repo.FixitRow): { session: repo.SessionRow; a
       const anchor = repo
         .getSessionQuestions(existing.id)
         .find((q) => q.askedIndex === 0);
-      if (anchor) return { session: existing, anchor };
+      if (anchor) {
+        if ((existing.configJson.voiceMode === true) !== voiceMode) {
+          repo.setSessionVoiceMode(existing.id, voiceMode);
+          existing.configJson.voiceMode = voiceMode;
+        }
+        return { session: existing, anchor };
+      }
     }
   }
 
@@ -46,6 +55,7 @@ export function startLesson(fixit: repo.FixitRow): { session: repo.SessionRow; a
       secondsPerQuestion: null,
       rounds: null,
       fixitId: fixit.id,
+      voiceMode,
     },
   });
   // Anchor: a verbatim copy of the missed question. Never graded; the coach

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { GradeCard, type GradeView } from "./GradeCard";
 import { readSseStream } from "@/lib/client/sse";
+import { useVoiceSession, type SpokenTurnPayload } from "@/lib/voice/useVoiceSession";
 
 export type LearnFixitView = {
   id: string;
@@ -45,6 +46,8 @@ export type LearnInitialState = {
     activeProof: LearnQuestionView | null;
   } | null;
   proofTarget: number;
+  voiceAvailable: boolean;
+  voiceFake: boolean;
 };
 
 type Phase = "starting" | "lesson" | "proving" | "closed" | "error";
@@ -69,8 +72,71 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   const [passes, setPasses] = useState(0);
   const [lastProofFailed, setLastProofFailed] = useState(false);
 
+  const [voiceOn, setVoiceOn] = useState(false);
   const startedRef = useRef(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const phaseRef = useRef<Phase>("starting");
+  const sessionIdRef = useRef<string | null>(initial.resume?.sessionId ?? null);
+  const proofRef = useRef<LearnQuestionView | null>(initial.resume?.activeProof ?? null);
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
+  useEffect(() => {
+    proofRef.current = proof;
+  }, [proof]);
+
+  const voice = useVoiceSession({
+    enabled: voiceOn,
+    fake: initial.voiceFake,
+    sessionId: sessionId ?? "",
+    personaId: "coach",
+    interruptionsEnabled: false,
+    onTurn: (turn) => void handleSpokenTurn(turn),
+    onError: () => setVoiceOn(false),
+  });
+  const voiceRef = useRef(voice);
+  useEffect(() => {
+    voiceRef.current = voice;
+  }, [voice]);
+
+  async function handleSpokenTurn(turn: SpokenTurnPayload) {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    if (phaseRef.current === "lesson") {
+      await runCoachTurn(sid, turn.transcript);
+    } else if (phaseRef.current === "proving" && proofRef.current) {
+      await submitProofCore(turn.transcript, turn.voice);
+    }
+  }
+
+  async function toggleVoice() {
+    if (voiceOn) {
+      voiceRef.current.endListening();
+      voiceRef.current.disconnect();
+      setVoiceOn(false);
+      return;
+    }
+    const sid = sessionIdRef.current;
+    try {
+      if (sid && initial.kind === "lesson") {
+        await fetch(`/api/fixits/${initial.fixit.id}/lesson`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ voice: true }),
+        });
+      }
+      setVoiceOn(true);
+      await voiceRef.current.connect();
+      if (phaseRef.current === "lesson" || phaseRef.current === "proving") {
+        voiceRef.current.beginListening();
+      }
+    } catch {
+      setVoiceOn(false);
+    }
+  }
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -133,6 +199,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         onDelta: (t) => {
           spoken += t;
           setStreamingText(spoken);
+          if (voiceOn) voiceRef.current.speakDelta(t);
         },
         onDone: (d) => {
           action = d.action;
@@ -141,6 +208,10 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       setChat((c) => [...c, { id: `coach-${Date.now()}`, role: "coach", content: spoken }]);
       setStreamingText(null);
       if (action === "check") setCoachSaysReady(true);
+      if (voiceOn) {
+        await voiceRef.current.speakFlush();
+        voiceRef.current.beginListening();
+      }
     } catch (err) {
       setStreamingText(null);
       setError(err instanceof Error ? err.message : "Coach turn failed");
@@ -175,6 +246,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       setProofGrade(null);
       setLastProofFailed(false);
       setPhase("proving");
+      if (voiceOn) voiceRef.current.beginListening();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start the check");
     } finally {
@@ -183,17 +255,24 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   }
 
   async function submitProofAnswer() {
-    if (!sessionId || !proof || proofAnswer.trim().length === 0 || busy) return;
+    if (proofAnswer.trim().length === 0 || busy) return;
     const submitted = proofAnswer.trim();
     setProofAnswer("");
+    await submitProofCore(submitted, null);
+  }
+
+  async function submitProofCore(submitted: string, voicePayload: SpokenTurnPayload["voice"] | null) {
+    const sid = sessionIdRef.current;
+    const q = proofRef.current;
+    if (!sid || !q) return;
     setProofTurns((t) => [...t, { role: "you", content: submitted }]);
     setBusy(true);
     setProofStreaming("");
     try {
-      const res = await fetch(`/api/sessions/${sessionId}/answer`, {
+      const res = await fetch(`/api/sessions/${sid}/answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: proof.id, answer: submitted }),
+        body: JSON.stringify({ questionId: q.id, answer: submitted, voice: voicePayload }),
       });
       if (!res.ok || !res.body) {
         throw new Error(((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? "Failed to submit");
@@ -204,6 +283,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         onDelta: (t) => {
           spoken += t;
           setProofStreaming(spoken);
+          if (voiceOn) voiceRef.current.speakDelta(t);
         },
         onDone: (d) => {
           action = d.action;
@@ -211,8 +291,11 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       });
       setProofTurns((t) => [...t, { role: "interviewer", content: spoken }]);
       setProofStreaming(null);
+      if (voiceOn) await voiceRef.current.speakFlush();
       if (action === "wrapup") {
-        await gradeProof(proof.id);
+        await gradeProof(q.id);
+      } else if (voiceOn) {
+        voiceRef.current.beginListening();
       }
     } catch (err) {
       setProofStreaming(null);
@@ -265,19 +348,42 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   // ---------- render ----------
 
   const header = (
-    <div className="mb-5">
-      <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
-        <Link href="/" className="hover:text-slate-300">
-          Dashboard
-        </Link>
-        <span>/</span>
-        <span>{initial.kind === "spotcheck" ? "Spot-check" : "Learn"}</span>
+    <div className="mb-5 flex items-start justify-between gap-4">
+      <div>
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
+          <Link href="/" className="hover:text-slate-300">
+            Dashboard
+          </Link>
+          <span>/</span>
+          <span>{initial.kind === "spotcheck" ? "Spot-check" : "Learn"}</span>
+        </div>
+        <h1 className="mt-1 text-xl font-semibold text-slate-100">{fixit.concept}</h1>
+        <p className="text-sm text-slate-500">
+          {fixit.subtopicName} · {fixit.areaName}
+          {fixit.attempts > 0 && ` · missed ${fixit.attempts + 1}×`}
+        </p>
       </div>
-      <h1 className="mt-1 text-xl font-semibold text-slate-100">{fixit.concept}</h1>
-      <p className="text-sm text-slate-500">
-        {fixit.subtopicName} · {fixit.areaName}
-        {fixit.attempts > 0 && ` · missed ${fixit.attempts + 1}×`}
-      </p>
+      {initial.voiceAvailable && (phase === "lesson" || phase === "proving") && (
+        <button
+          onClick={() => void toggleVoice()}
+          className={`shrink-0 rounded px-3 py-1.5 text-xs font-semibold ${
+            voiceOn
+              ? "bg-indigo-600 text-white hover:bg-indigo-500"
+              : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+          }`}
+        >
+          {voiceOn ? "🎙 Voice on" : "🎙 Talk it through"}
+        </button>
+      )}
+    </div>
+  );
+
+  const captionsStrip = voiceOn && voice.listening && (
+    <div className="mt-3 rounded-lg border border-indigo-500/40 bg-indigo-500/5 p-3 text-sm italic text-slate-300">
+      <span className="mr-2 not-italic text-xs uppercase tracking-wide text-indigo-300">
+        listening
+      </span>
+      {voice.captions || "…"}
     </div>
   );
 
@@ -396,6 +502,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             </Bubble>
           </div>
         )}
+        {captionsStrip}
 
         {proofGrade ? (
           <div className="mt-5 space-y-4">
@@ -491,6 +598,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             {streamingText || <Spinner label="thinking" inline />}
           </Bubble>
         )}
+        {captionsStrip}
         <div ref={chatEndRef} />
       </div>
 

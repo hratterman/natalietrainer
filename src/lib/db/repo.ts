@@ -68,6 +68,17 @@ export function updateSessionStatus(sessionId: string, status: SessionStatus): v
     .run();
 }
 
+/** Learn sessions: flip spoken-lesson mode on resume. */
+export function setSessionVoiceMode(sessionId: string, voiceMode: boolean): void {
+  const session = getSession(sessionId);
+  if (!session) return;
+  getDb()
+    .update(sessions)
+    .set({ configJson: { ...session.configJson, voiceMode } })
+    .where(eq(sessions.id, sessionId))
+    .run();
+}
+
 export function saveSessionDebrief(sessionId: string, debrief: unknown): void {
   getDb()
     .update(sessions)
