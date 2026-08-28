@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { GradeCard, type GradeView } from "./GradeCard";
 import { readSseStream } from "@/lib/client/sse";
+import { Bubble as UiBubble } from "./ui/Bubble";
+import { Spinner } from "./ui/Spinner";
 import { useVoiceSession, type SpokenTurnPayload } from "@/lib/voice/useVoiceSession";
 
 export type LearnFixitView = {
@@ -411,15 +413,15 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   const header = (
     <div className="mb-5 flex items-start justify-between gap-4">
       <div>
-        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-slate-500">
-          <Link href="/" className="hover:text-slate-300">
+        <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-ink-400">
+          <Link href="/" className="hover:text-ink-900">
             Dashboard
           </Link>
           <span>/</span>
           <span>{initial.kind === "spotcheck" ? "Spot-check" : "Learn"}</span>
         </div>
-        <h1 className="mt-1 text-xl font-semibold text-slate-100">{fixit.concept}</h1>
-        <p className="text-sm text-slate-500">
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-ink-900">{fixit.concept}</h1>
+        <p className="text-sm text-ink-400">
           {fixit.subtopicName} · {fixit.areaName}
           {fixit.attempts > 0 && ` · missed ${fixit.attempts + 1}×`}
         </p>
@@ -429,8 +431,8 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
           onClick={() => void toggleVoice()}
           className={`shrink-0 rounded px-3 py-1.5 text-xs font-semibold ${
             voiceOn
-              ? "bg-indigo-600 text-white hover:bg-indigo-500"
-              : "bg-slate-800 text-slate-300 hover:bg-slate-700"
+              ? "bg-primary text-white hover:bg-primary"
+              : "bg-surface-2 text-ink-900 hover:bg-line"
           }`}
         >
           {voiceOn ? "🎙 Voice on" : "🎙 Talk it through"}
@@ -440,8 +442,8 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   );
 
   const captionsStrip = voiceOn && voice.listening && (
-    <div className="mt-3 rounded-lg border border-indigo-500/40 bg-indigo-500/5 p-3 text-sm italic text-slate-300">
-      <span className="mr-2 not-italic text-xs uppercase tracking-wide text-indigo-300">
+    <div className="mt-3 rounded-lg border border-primary/30 bg-primary-tint p-3 text-sm italic text-ink-900">
+      <span className="mr-2 not-italic text-xs uppercase tracking-wide text-primary">
         listening
       </span>
       {voice.captions || "…"}
@@ -461,8 +463,8 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
     return (
       <div className="mx-auto max-w-3xl">
         {header}
-        <p className="text-sm text-rose-400">{error}</p>
-        <Link href="/" className="mt-4 inline-block text-sm text-indigo-400 hover:text-indigo-300">
+        <p className="text-sm text-bad">{error}</p>
+        <Link href="/" className="mt-4 inline-block text-sm font-medium text-primary hover:text-primary-strong">
           ← Back to dashboard
         </Link>
       </div>
@@ -479,36 +481,36 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         <div
           className={`mt-5 rounded-lg border p-5 ${
             reopened
-              ? "border-rose-500/40 bg-rose-500/10"
-              : "border-emerald-500/40 bg-emerald-500/10"
+              ? "border-bad/40 bg-bad-tint"
+              : "border-good/40 bg-good-tint"
           }`}
         >
           {reopened ? (
             <>
-              <h2 className="font-semibold text-rose-300">Not there yet — it&apos;s back in your queue</h2>
-              <p className="mt-1 text-sm text-slate-300">
+              <h2 className="font-semibold text-bad">Not there yet — it&apos;s back in your queue</h2>
+              <p className="mt-1 text-sm text-ink-900">
                 The concept reopened with your latest miss as the new starting point.
               </p>
               <Link
                 href={`/learn/${fixit.id}`}
-                className="mt-3 inline-block rounded bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500"
+                className="mt-3 inline-block btn btn-primary"
               >
                 Relearn it now →
               </Link>
             </>
           ) : cleared ? (
             <>
-              <h2 className="font-semibold text-emerald-300">Cleared for good 🎉</h2>
-              <p className="mt-1 text-sm text-slate-300">
+              <h2 className="font-semibold text-good">Cleared for good 🎉</h2>
+              <p className="mt-1 text-sm text-ink-900">
                 You&apos;ve proven this twice over spaced checks. It&apos;s out of your queue.
               </p>
             </>
           ) : (
             <>
-              <h2 className="font-semibold text-emerald-300">
+              <h2 className="font-semibold text-good">
                 {initial.kind === "spotcheck" ? "Spot-check passed" : "Proven — nice work"}
               </h2>
-              <p className="mt-1 text-sm text-slate-300">
+              <p className="mt-1 text-sm text-ink-900">
                 It&apos;ll resurface for a quick spot-check{" "}
                 {fixit.nextCheckAt ? `on ${new Date(fixit.nextCheckAt).toLocaleDateString()}` : "soon"} to make
                 sure it stuck.
@@ -516,7 +518,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             </>
           )}
         </div>
-        <Link href="/" className="mt-5 inline-block text-sm text-indigo-400 hover:text-indigo-300">
+        <Link href="/" className="mt-5 inline-block text-sm font-medium text-primary hover:text-primary-strong">
           ← Back to dashboard
         </Link>
       </div>
@@ -527,17 +529,17 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
     return (
       <div className="mx-auto max-w-3xl">
         {header}
-        <div className="mb-4 flex items-center justify-between text-sm text-slate-400">
+        <div className="mb-4 flex items-center justify-between text-sm text-ink-600">
           <span>
             {initial.kind === "spotcheck"
               ? "Spot-check — one question, cold."
               : `Prove it: ${passes}/${initial.proofTarget} passed${passes > 0 ? " in a row" : ""}`}
           </span>
         </div>
-        <div className="rounded-lg border border-slate-700 bg-slate-900 p-5">
-          <p className="whitespace-pre-wrap text-base leading-relaxed text-slate-100">{proof.promptText}</p>
+        <div className="card card-pad">
+          <p className="whitespace-pre-wrap text-base leading-relaxed text-ink-900">{proof.promptText}</p>
           {proof.setupFactsJson.length > 0 && (
-            <ul className="mt-3 space-y-1 border-t border-slate-800 pt-3 text-sm text-slate-400">
+            <ul className="mt-3 space-y-1 border-t border-line pt-3 text-sm text-ink-600">
               {proof.setupFactsJson.map((f, i) => (
                 <li key={i} className="font-mono">
                   {f}
@@ -572,13 +574,13 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
               <div className="flex gap-3">
                 <button
                   onClick={backToLesson}
-                  className="flex-1 rounded bg-indigo-600 px-4 py-2.5 text-sm font-semibold hover:bg-indigo-500"
+                  className="btn btn-primary flex-1"
                 >
                   Back to the lesson
                 </button>
                 <button
                   onClick={() => void startCheck()}
-                  className="flex-1 rounded bg-slate-800 px-4 py-2.5 text-sm font-semibold hover:bg-slate-700"
+                  className="btn btn-secondary flex-1"
                 >
                   Try another question
                 </button>
@@ -586,7 +588,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             ) : (
               <button
                 onClick={() => void startCheck()}
-                className="w-full rounded bg-indigo-600 px-4 py-2.5 text-sm font-semibold hover:bg-indigo-500"
+                className="btn btn-primary w-full"
               >
                 {passes >= initial.proofTarget ? "Finish →" : "Next check question →"}
               </button>
@@ -608,12 +610,12 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
                 }}
                 rows={5}
                 placeholder="Answer cold — no notes, no coach. (Cmd/Ctrl+Enter to submit)"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none"
+                className="input"
               />
               <button
                 onClick={() => void submitProofAnswer()}
                 disabled={proofAnswer.trim().length === 0}
-                className="rounded bg-indigo-600 px-5 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-40"
+                className="btn btn-primary"
               >
                 Submit answer
               </button>
@@ -621,7 +623,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
           )
         )}
         {busy && proofStreaming === null && !proofGrade && <Spinner label="Grading…" />}
-        {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
+        {error && <p className="mt-3 text-sm text-bad">{error}</p>}
       </div>
     );
   }
@@ -632,11 +634,11 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       {header}
 
       {initial.sourceQuestion && (
-        <details className="mb-4 rounded-lg border border-slate-800 bg-slate-900/60 p-4 text-sm">
-          <summary className="cursor-pointer text-slate-400">The question you missed</summary>
-          <p className="mt-2 whitespace-pre-wrap text-slate-200">{initial.sourceQuestion.promptText}</p>
+        <details className="mb-4 card p-4 text-sm">
+          <summary className="cursor-pointer text-ink-600">The question you missed</summary>
+          <p className="mt-2 whitespace-pre-wrap text-ink-900">{initial.sourceQuestion.promptText}</p>
           {initial.sourceQuestion.setupFacts.map((f, i) => (
-            <div key={i} className="mt-1 font-mono text-xs text-slate-500">
+            <div key={i} className="mt-1 font-mono text-xs text-ink-400">
               {f}
             </div>
           ))}
@@ -646,7 +648,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
       <div className="space-y-3">
         {chat.map((t) =>
           t.role === "system" ? (
-            <div key={t.id} className="text-center text-xs text-slate-500">
+            <div key={t.id} className="text-center text-xs text-ink-400">
               — {t.content} —
             </div>
           ) : (
@@ -668,7 +670,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         <button
           onClick={() => void startCheck()}
           disabled={busy}
-          className="mt-4 w-full rounded bg-emerald-600 px-4 py-2.5 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-40"
+          className="mt-4 btn btn-primary w-full"
         >
           Start the check — prove it on fresh questions →
         </button>
@@ -687,13 +689,13 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
           rows={2}
           disabled={busy}
           placeholder="Reply to the coach, or ask anything… (Enter to send)"
-          className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none disabled:opacity-60"
+          className="input"
         />
         <div className="flex items-center justify-between">
           <button
             onClick={() => void sendMessage()}
             disabled={busy || message.trim().length === 0}
-            className="rounded bg-indigo-600 px-5 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-40"
+            className="btn btn-primary"
           >
             Send
           </button>
@@ -701,7 +703,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             <button
               onClick={() => void startCheck()}
               disabled={busy}
-              className="text-xs text-slate-500 hover:text-slate-300 disabled:opacity-40"
+              className="text-xs font-medium text-ink-400 hover:text-ink-900 disabled:opacity-40"
             >
               I&apos;m ready — test me
             </button>
@@ -709,11 +711,12 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         </div>
       </div>
 
-      {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
+      {error && <p className="mt-3 text-sm text-bad">{error}</p>}
     </div>
   );
 }
 
+/** Adapter: learn chat speaks in roles ("you"/"coach"); the ui Bubble in sides. */
 function Bubble({
   role,
   label,
@@ -723,30 +726,9 @@ function Bubble({
   label: string;
   children: React.ReactNode;
 }) {
-  const isCoach = role === "coach";
   return (
-    <div className={`flex ${isCoach ? "justify-start" : "justify-end"}`}>
-      <div
-        className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-4 py-2.5 text-sm leading-relaxed ${
-          isCoach
-            ? "border border-slate-700 bg-slate-800/80 text-slate-200"
-            : "border border-indigo-500/30 bg-indigo-500/10 text-slate-100"
-        }`}
-      >
-        <div className="mb-1 text-[11px] uppercase tracking-wide text-slate-500">{label}</div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-function Spinner({ label, inline = false }: { label: string; inline?: boolean }) {
-  return (
-    <span
-      className={`${inline ? "inline-flex" : "mt-4 flex justify-center"} items-center gap-2 text-sm text-slate-400`}
-    >
-      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-indigo-400" />
-      {label}
-    </span>
+    <UiBubble side={role === "you" ? "you" : "them"} label={label}>
+      {children}
+    </UiBubble>
   );
 }

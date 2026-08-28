@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import * as repo from "@/lib/db/repo";
 import { AREAS, allSubtopics } from "@/content/taxonomy";
@@ -6,6 +7,7 @@ import { FOLLOW_UP_CAPS } from "@/lib/session/engine";
 import { SessionRunner, type RunnerInitialState } from "@/components/SessionRunner";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Session" };
 
 export default async function TrainSessionPage({
   params,

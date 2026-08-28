@@ -6,6 +6,8 @@ import { CountdownTimer, CountUpTimer } from "./Timer";
 import { GradeCard, type GradeView } from "./GradeCard";
 import { TranscriptView, type TurnView } from "./TranscriptView";
 import { readSseStream } from "@/lib/client/sse";
+import { CenterCard } from "./ui/CenterCard";
+import { Spinner } from "./ui/Spinner";
 import {
   useVoiceSession,
   type InterjectionEvent,
@@ -605,20 +607,20 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
   if (phase === "error") {
     return (
       <CenterCard title="Something went wrong">
-        <p className="text-sm text-rose-400">{error}</p>
+        <p className="text-sm text-bad">{error}</p>
         <div className="mt-4 flex gap-3">
           <button
             onClick={() => {
               // Nothing is lost server-side — reload and resume from truth.
               window.location.reload();
             }}
-            className="rounded bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700"
+            className="btn btn-secondary"
           >
             Keep going
           </button>
           <button
             onClick={() => void complete()}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm hover:bg-indigo-500"
+            className="rounded bg-primary px-4 py-2 text-sm hover:bg-primary"
           >
             End session &amp; debrief
           </button>
@@ -630,14 +632,14 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
   if (phase === "voiceCheck") {
     return (
       <CenterCard title="Voice check">
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-ink-600">
           You&apos;ll answer out loud. A few seconds of silence ends your turn — just like a real
           interview. Headphones are strongly recommended.
         </p>
         {voice.status === "idle" && (
           <button
             onClick={() => void startVoiceCheck()}
-            className="mt-4 rounded bg-indigo-600 px-5 py-2 text-sm font-semibold hover:bg-indigo-500"
+            className="mt-4 btn btn-primary"
           >
             Enable microphone
           </button>
@@ -645,24 +647,24 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
         {voice.status === "connecting" && <Spinner label="Connecting voice…" />}
         {voice.status === "ready" && (
           <div className="mt-4 space-y-3">
-            <p className="text-sm text-slate-300">Say something — you should see it appear:</p>
-            <div className="min-h-10 rounded border border-slate-800 bg-slate-950 p-3 text-sm italic text-slate-300">
+            <p className="text-sm text-ink-900">Say something — you should see it appear:</p>
+            <div className="min-h-10 rounded border border-line bg-surface-2 p-3 text-sm italic text-ink-900">
               {voice.captions || "…"}
             </div>
-            {checkHeard && <p className="text-sm text-emerald-400">Mic and captions working.</p>}
+            {checkHeard && <p className="text-sm text-good">Mic and captions working.</p>}
             <button
               onClick={beginVoiceInterview}
               disabled={!checkHeard && !initial.voiceFake}
-              className="w-full rounded bg-indigo-600 px-5 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:opacity-40"
+              className="w-full btn btn-primary"
             >
               Start the interview
             </button>
           </div>
         )}
         {voice.status === "error" && (
-          <p className="mt-3 text-sm text-rose-400">{voice.error}</p>
+          <p className="mt-3 text-sm text-bad">{voice.error}</p>
         )}
-        <button onClick={continueTyping} className="mt-4 text-xs text-slate-500 hover:text-slate-300">
+        <button onClick={continueTyping} className="mt-4 text-xs font-medium text-ink-400 hover:text-ink-900">
           Continue with typing instead
         </button>
       </CenterCard>
@@ -718,13 +720,13 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
         <div className="flex justify-center gap-3">
           <button
             onClick={() => void advance()}
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500"
+            className="btn btn-primary"
           >
             Continue
           </button>
           <button
             onClick={() => void complete()}
-            className="rounded bg-slate-800 px-4 py-2 text-sm hover:bg-slate-700"
+            className="btn btn-secondary"
           >
             Finish session
           </button>
@@ -743,14 +745,14 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
     <div className="mx-auto max-w-3xl">
       {/* Non-fatal notice (e.g. voice dropped → typing) */}
       {error && (
-        <div className="mb-4 rounded border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+        <div className="mb-4 rounded border border-warn/40 bg-warn-tint px-4 py-2 text-sm text-warn">
           {error}
         </div>
       )}
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
-        <div className="text-sm text-slate-400">
-          <span className="font-semibold text-slate-200 capitalize">{modeLabel(mode)}</span>
+        <div className="text-sm text-ink-600">
+          <span className="font-semibold text-ink-900 capitalize">{modeLabel(mode)}</span>
           {currentRound && roundIndex !== null && (
             <span>
               {" "}
@@ -781,12 +783,12 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       </div>
 
       {/* Question card (voice mode shows it as reference after the opening is spoken) */}
-      <div className="rounded-lg border border-slate-700 bg-slate-900 p-5">
-        <p className="text-base leading-relaxed text-slate-100 whitespace-pre-wrap">
+      <div className="card card-pad">
+        <p className="text-base leading-relaxed text-ink-900 whitespace-pre-wrap">
           {question.promptText}
         </p>
         {question.setupFactsJson.length > 0 && (
-          <ul className="mt-3 space-y-1 border-t border-slate-800 pt-3 text-sm text-slate-400">
+          <ul className="mt-3 space-y-1 border-t border-line pt-3 text-sm text-ink-600">
             {question.setupFactsJson.map((fact, i) => (
               <li key={i} className="font-mono">
                 {fact}
@@ -806,8 +808,8 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       {/* Interviewer speaking / streaming */}
       {(phase === "streaming" || phase === "interviewerSpeaking") && (
         <div className="mt-3 flex justify-start">
-          <div className="max-w-[85%] rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2.5 text-sm leading-relaxed text-slate-200 whitespace-pre-wrap">
-            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-slate-500">
+          <div className="max-w-[85%] rounded-lg border border-line-strong bg-surface-2 px-4 py-2.5 text-sm leading-relaxed text-ink-900 whitespace-pre-wrap">
+            <div className="mb-1 flex items-center gap-2 text-[11px] uppercase tracking-wide text-ink-400">
               {personaName ?? "Interviewer"}
               {voiceActive && <SpeakingDots />}
             </div>
@@ -820,28 +822,28 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       {phase === "listening" && (
         <div
           data-listening={voice.listening ? "true" : "false"}
-          className="mt-5 rounded-lg border border-indigo-500/40 bg-indigo-500/5 p-4"
+          className="mt-5 rounded-lg border border-primary/30 bg-primary-tint p-4"
         >
-          <div className="flex items-center gap-2 text-sm text-indigo-300">
+          <div className="flex items-center gap-2 text-sm text-primary">
             {voice.listening ? (
               <>
                 <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-400" />
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-60" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
                 </span>
                 {personaName ?? "The interviewer"} is listening — speak your answer
               </>
             ) : (
               <>
-                <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
+                <span className="h-2.5 w-2.5 rounded-full bg-bad" />
                 {personaName ?? "The interviewer"} has the floor…
               </>
             )}
           </div>
-          <div className="mt-3 min-h-12 text-sm italic leading-relaxed text-slate-300">
+          <div className="mt-3 min-h-12 text-sm italic leading-relaxed text-ink-900">
             {voice.captions || "…"}
           </div>
-          <p className="mt-2 text-xs text-slate-600">
+          <p className="mt-2 text-xs text-ink-400">
             Pause for a few seconds when you&apos;re done — your answer submits automatically.
           </p>
         </div>
@@ -862,7 +864,7 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
           <GradeCard grade={grade} learnHref={gradeFixitId ? `/learn/${gradeFixitId}` : null} />
           <button
             onClick={() => void advance()}
-            className="w-full rounded bg-indigo-600 px-4 py-2.5 text-sm font-semibold hover:bg-indigo-500"
+            className="btn btn-primary w-full"
           >
             Next question →
           </button>
@@ -899,13 +901,13 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
                   }
                 : undefined
             }
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 p-3 text-sm text-slate-100 placeholder:text-slate-600 focus:border-indigo-500 focus:outline-none"
+            className="input"
           />
           {mode !== "rapid" && (
             <div>
               <button
                 onClick={() => setShowScratchpad((v) => !v)}
-                className="text-xs text-slate-500 hover:text-slate-300"
+                className="text-xs font-medium text-ink-400 hover:text-ink-900"
               >
                 {showScratchpad ? "▾ hide scratchpad" : "▸ scratchpad (arithmetic — not graded)"}
               </button>
@@ -915,7 +917,7 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
                   onChange={(e) => setScratchpad(e.target.value)}
                   rows={4}
                   placeholder="100 × 1.1^5 ≈ 161…"
-                  className="mt-2 w-full rounded-lg border border-slate-800 bg-slate-950 p-3 font-mono text-xs text-slate-300 placeholder:text-slate-700 focus:border-slate-600 focus:outline-none"
+                  className="input mt-2 font-mono text-xs"
                 />
               )}
             </div>
@@ -924,28 +926,28 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
             <button
               onClick={() => void submitTyped()}
               disabled={answer.trim().length === 0}
-              className="rounded bg-indigo-600 px-5 py-2 text-sm font-semibold hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+              className="btn btn-primary"
             >
               Submit answer
             </button>
             <button
               onClick={() => void complete()}
-              className="text-xs text-slate-500 hover:text-slate-300"
+              className="text-xs font-medium text-ink-400 hover:text-ink-900"
             >
               End session early
             </button>
           </div>
           {mode !== "rapid" && (
-            <p className="text-xs text-slate-600">Follow-ups allowed on this question: {followUpCap}</p>
+            <p className="text-xs text-ink-400">Follow-ups allowed on this question: {followUpCap}</p>
           )}
         </div>
       )}
 
       {/* Voice-mode footer actions */}
       {voiceActive && (phase === "listening" || phase === "interviewerSpeaking") && (
-        <div className="mt-4 flex items-center justify-between text-xs text-slate-600">
+        <div className="mt-4 flex items-center justify-between text-xs text-ink-400">
           <span>{phase === "listening" ? "You can interrupt the interviewer by speaking." : ""}</span>
-          <button onClick={() => void complete()} className="hover:text-slate-300">
+          <button onClick={() => void complete()} className="hover:text-ink-900">
             End session early
           </button>
         </div>
@@ -960,30 +962,12 @@ function modeLabel(mode: string): string {
   ] ?? mode;
 }
 
-function CenterCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mx-auto mt-16 max-w-md rounded-lg border border-slate-800 bg-slate-900 p-6 text-center">
-      <h2 className="mb-4 text-lg font-semibold text-slate-100">{title}</h2>
-      {children}
-    </div>
-  );
-}
-
-function Spinner({ label, inline = false }: { label: string; inline?: boolean }) {
-  return (
-    <span className={`${inline ? "inline-flex" : "flex justify-center"} items-center gap-2 text-sm text-slate-400`}>
-      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-600 border-t-indigo-400" />
-      {label}
-    </span>
-  );
-}
-
 function SpeakingDots() {
   return (
     <span className="inline-flex items-end gap-0.5" aria-label="speaking">
-      <span className="h-1.5 w-1 animate-pulse rounded-sm bg-indigo-400 [animation-delay:0ms]" />
-      <span className="h-2.5 w-1 animate-pulse rounded-sm bg-indigo-400 [animation-delay:150ms]" />
-      <span className="h-1.5 w-1 animate-pulse rounded-sm bg-indigo-400 [animation-delay:300ms]" />
+      <span className="h-1.5 w-1 animate-pulse rounded-sm bg-primary [animation-delay:0ms]" />
+      <span className="h-2.5 w-1 animate-pulse rounded-sm bg-primary [animation-delay:150ms]" />
+      <span className="h-1.5 w-1 animate-pulse rounded-sm bg-primary [animation-delay:300ms]" />
     </span>
   );
 }
@@ -1024,10 +1008,10 @@ function RoundBreak({
   }, []);
   return (
     <CenterCard title={`Round ${roundNumber} of ${totalRounds}`}>
-      <p className="text-sm text-slate-300">
-        {areaName} — with <span className="font-semibold text-slate-100">{personaName}</span>
+      <p className="text-sm text-ink-900">
+        {areaName} — with <span className="font-semibold text-ink-900">{personaName}</span>
       </p>
-      <p className="mt-4 text-xs text-slate-500">
+      <p className="mt-4 text-xs text-ink-400">
         Take a breath. Next round starts in {secondsLeft}s.
       </p>
       <button
@@ -1037,7 +1021,7 @@ function RoundBreak({
           firedRef.current = true;
           onStartRef.current();
         }}
-        className="mt-4 rounded bg-indigo-600 px-5 py-2 text-sm font-semibold hover:bg-indigo-500"
+        className="mt-4 btn btn-primary"
       >
         I&apos;m ready — start now
       </button>

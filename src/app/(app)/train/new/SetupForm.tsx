@@ -151,7 +151,7 @@ export function SetupForm({
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="text-xl font-semibold text-slate-100">New session</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-ink-900">New session</h1>
 
       {/* Mode cards */}
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -161,12 +161,12 @@ export function SetupForm({
             onClick={() => setMode(card.mode)}
             className={`rounded-lg border p-4 text-left transition ${
               mode === card.mode
-                ? "border-indigo-500 bg-indigo-500/10"
-                : "border-slate-800 bg-slate-900 hover:border-slate-600"
+                ? "border-primary bg-primary-tint"
+                : "border-line bg-surface-1 hover:border-line-strong"
             }`}
           >
-            <div className="font-semibold text-slate-100">{card.title}</div>
-            <div className="mt-1 text-sm text-slate-400">{card.blurb}</div>
+            <div className="font-semibold text-ink-900">{card.title}</div>
+            <div className="mt-1 text-sm text-ink-600">{card.blurb}</div>
           </button>
         ))}
       </div>
@@ -179,13 +179,13 @@ export function SetupForm({
           data-voice-on={voiceMode && voiceAvailable ? "true" : "false"}
           className={`mt-4 flex w-full items-center justify-between rounded-lg border p-4 text-left transition ${
             voiceMode && voiceAvailable
-              ? "border-indigo-500 bg-indigo-500/10"
-              : "border-slate-800 bg-slate-900"
-          } ${voiceAvailable ? "hover:border-slate-600" : "cursor-not-allowed opacity-60"}`}
+              ? "border-primary bg-primary-tint"
+              : "border-line bg-surface-1"
+          } ${voiceAvailable ? "hover:border-line-strong" : "cursor-not-allowed opacity-60"}`}
         >
           <div>
-            <div className="font-semibold text-slate-100">🎙 Voice interview</div>
-            <div className="mt-1 text-sm text-slate-400">
+            <div className="font-semibold text-ink-900">🎙 Voice interview</div>
+            <div className="mt-1 text-sm text-ink-600">
               {voiceAvailable
                 ? "Speak your answers out loud to an interviewer with a real voice. Silence ends your turn — no editing, like the real thing."
                 : "Requires OPENAI_API_KEY in .env.local — voice powers the mic transcription and the interviewer's voice."}
@@ -193,7 +193,7 @@ export function SetupForm({
           </div>
           <span
             className={`ml-4 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
-              voiceMode && voiceAvailable ? "bg-indigo-500" : "bg-slate-700"
+              voiceMode && voiceAvailable ? "bg-primary" : "bg-line-strong"
             }`}
           >
             <span
@@ -206,24 +206,24 @@ export function SetupForm({
       )}
 
       {/* Mode-specific options */}
-      <div className="mt-6 space-y-6 rounded-lg border border-slate-800 bg-slate-900 p-5">
+      <div className="mt-6 space-y-6 card card-pad">
         {mode === "drill" && (
           <section>
-            <h3 className="text-sm font-semibold text-slate-200">Subtopics to drill</h3>
+            <h3 className="text-sm font-semibold text-ink-900">Subtopics to drill</h3>
             <div className="mt-3 space-y-4">
               {taxonomy.areas.map((area) => (
                 <details key={area.id} open={expandedAreas.has(area.id)}>
-                  <summary className="cursor-pointer text-sm text-slate-300">
+                  <summary className="cursor-pointer text-sm text-ink-900">
                     {area.name}
                     {area.tier === 1 && (
-                      <span className="ml-2 rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] uppercase text-indigo-300">
+                      <span className="ml-2 rounded bg-primary-tint px-1.5 py-0.5 text-[10px] uppercase text-primary">
                         core
                       </span>
                     )}
                   </summary>
                   <div className="mt-2 grid grid-cols-1 gap-1.5 pl-4 sm:grid-cols-2">
                     {area.subtopics.map((s) => (
-                      <label key={s.id} className="flex items-center gap-2 text-sm text-slate-400">
+                      <label key={s.id} className="flex items-center gap-2 text-sm text-ink-600">
                         <input
                           type="checkbox"
                           checked={subtopicIds.includes(s.id)}
@@ -242,10 +242,10 @@ export function SetupForm({
 
         {(mode === "mock" || mode === "rapid") && (
           <section>
-            <h3 className="text-sm font-semibold text-slate-200">Areas in scope</h3>
+            <h3 className="text-sm font-semibold text-ink-900">Areas in scope</h3>
             <div className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {taxonomy.areas.map((area) => (
-                <label key={area.id} className="flex items-center gap-2 text-sm text-slate-400">
+                <label key={area.id} className="flex items-center gap-2 text-sm text-ink-600">
                   <input
                     type="checkbox"
                     checked={areaIds.includes(area.id)}
@@ -254,7 +254,7 @@ export function SetupForm({
                   />
                   {area.name}
                   {area.tier === 1 && (
-                    <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[10px] uppercase text-indigo-300">
+                    <span className="rounded bg-primary-tint px-1.5 py-0.5 text-[10px] uppercase text-primary">
                       core
                     </span>
                   )}
@@ -267,25 +267,25 @@ export function SetupForm({
         {mode === "superday" && (
           <section>
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-slate-200">Round plan</h3>
+              <h3 className="text-sm font-semibold text-ink-900">Round plan</h3>
               <button
                 onClick={() => setSuperdayRounds(shuffledPanel(taxonomy.personas.map((p) => p.id)))}
-                className="rounded bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+                className="btn btn-secondary btn-sm"
               >
                 Shuffle panel
               </button>
             </div>
-            <ol className="mt-3 space-y-2 text-sm text-slate-300">
+            <ol className="mt-3 space-y-2 text-sm text-ink-900">
               {superdayRounds.map((round, i) => (
                 <li key={i} className="flex items-center gap-3">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs">
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-2 text-xs">
                     {i + 1}
                   </span>
                   <span>
                     {taxonomy.areas.find((a) => a.id === round.focusAreaId)?.name ??
                       round.focusAreaId}{" "}
                     — {round.questionCount} questions with{" "}
-                    <span className="text-slate-100">
+                    <span className="text-ink-900">
                       {taxonomy.personas.find((p) => p.id === round.personaId)?.name ??
                         round.personaId}
                     </span>
@@ -293,7 +293,7 @@ export function SetupForm({
                 </li>
               ))}
             </ol>
-            <p className="mt-2 text-xs text-slate-500">
+            <p className="mt-2 text-xs text-ink-400">
               Four back-to-back rounds, ~12 questions, one overall debrief. Difficulty adapts to
               your mastery.
             </p>
@@ -303,13 +303,13 @@ export function SetupForm({
         {mode !== "superday" && (
           <section className="flex flex-wrap items-end gap-6">
             <div>
-              <label className="block text-sm font-semibold text-slate-200">Difficulty</label>
+              <label className="block text-sm font-semibold text-ink-900">Difficulty</label>
               <select
                 value={String(difficulty)}
                 onChange={(e) =>
                   setDifficulty(e.target.value === "adaptive" ? "adaptive" : Number(e.target.value))
                 }
-                className="mt-2 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
+                className="mt-2 rounded border border-line-strong bg-surface-2 px-3 py-1.5 text-sm text-ink-900"
               >
                 <option value="adaptive">Adaptive (recommended)</option>
                 {[1, 2, 3, 4, 5].map((d) => (
@@ -320,23 +320,23 @@ export function SetupForm({
               </select>
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-200">Questions</label>
+              <label className="block text-sm font-semibold text-ink-900">Questions</label>
               <input
                 type="number"
                 min={1}
                 max={30}
                 value={questionCount}
                 onChange={(e) => setQuestionCount(e.target.value)}
-                className="mt-2 w-24 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
+                className="input mt-2 w-24 px-3 py-1.5"
               />
             </div>
             {(mode === "mock" || (mode === "drill" && voiceMode && voiceAvailable)) && (
               <div>
-                <label className="block text-sm font-semibold text-slate-200">Interviewer</label>
+                <label className="block text-sm font-semibold text-ink-900">Interviewer</label>
                 <select
                   value={personaId}
                   onChange={(e) => setPersonaId(e.target.value)}
-                  className="mt-2 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
+                  className="mt-2 rounded border border-line-strong bg-surface-2 px-3 py-1.5 text-sm text-ink-900"
                 >
                   {taxonomy.personas.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -348,7 +348,7 @@ export function SetupForm({
             )}
             {mode === "rapid" && (
               <div>
-                <label className="block text-sm font-semibold text-slate-200">
+                <label className="block text-sm font-semibold text-ink-900">
                   Seconds per question
                 </label>
                 <input
@@ -357,7 +357,7 @@ export function SetupForm({
                   max={600}
                   value={secondsPerQuestion}
                   onChange={(e) => setSecondsPerQuestion(e.target.value)}
-                  className="mt-2 w-24 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
+                  className="input mt-2 w-24 px-3 py-1.5"
                 />
               </div>
             )}
@@ -365,12 +365,12 @@ export function SetupForm({
         )}
       </div>
 
-      {error && <p className="mt-4 text-sm text-rose-400">{error}</p>}
+      {error && <p className="mt-4 text-sm text-bad">{error}</p>}
 
       <button
         onClick={() => void start()}
         disabled={!canStart}
-        className="mt-6 w-full rounded bg-indigo-600 px-4 py-3 text-sm font-semibold hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-6 w-full rounded bg-primary px-4 py-3 text-sm font-semibold hover:bg-primary disabled:cursor-not-allowed disabled:opacity-40"
       >
         {starting ? "Writing your first question…" : "Start session"}
       </button>

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import * as repo from "@/lib/db/repo";
@@ -8,6 +9,7 @@ import { TranscriptView } from "@/components/TranscriptView";
 import type { Debrief } from "@/lib/llm/schemas";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Session debrief" };
 
 export default async function DebriefPage({ params }: PageProps<"/train/[sessionId]/debrief">) {
   const { sessionId } = await params;
@@ -26,8 +28,8 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-slate-100">Session debrief</h1>
-        <Link href="/train/new" className="text-sm text-indigo-400 hover:text-indigo-300">
+        <h1 className="text-2xl font-bold tracking-tight text-ink-900">Session debrief</h1>
+        <Link href="/train/new" className="text-sm font-medium text-primary hover:text-primary-strong">
           New session →
         </Link>
       </div>
@@ -35,11 +37,11 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
       {debrief ? (
         <>
           {/* Overall */}
-          <div className="mt-6 flex items-center gap-5 rounded-lg border border-slate-800 bg-slate-900 p-5">
+          <div className="mt-6 flex items-center gap-5 card card-pad">
             <ScoreBadge overall={debrief.overallScore} size="lg" />
             <div>
-              <div className="text-sm text-slate-400">Superday readiness on this material</div>
-              <div className="text-lg font-semibold text-slate-100">
+              <div className="text-sm text-ink-600">Superday readiness on this material</div>
+              <div className="text-lg font-semibold text-ink-900">
                 {debrief.overallScore >= 80
                   ? "Offer-quality"
                   : debrief.overallScore >= 60
@@ -51,8 +53,8 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
 
           {/* By area */}
           {debrief.byArea.length > 0 && (
-            <div className="mt-5 rounded-lg border border-slate-800 bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            <div className="mt-5 card card-pad">
+              <h2 className="section-label">
                 By area
               </h2>
               <div className="mt-3 space-y-3">
@@ -60,10 +62,10 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
                   <div key={area.areaId} className="flex items-start gap-3">
                     <ScoreBadge overall={area.score} />
                     <div>
-                      <div className="text-sm font-semibold text-slate-200">
+                      <div className="text-sm font-semibold text-ink-900">
                         {areaName(area.areaId)}
                       </div>
-                      <div className="text-sm text-slate-400">{area.comment}</div>
+                      <div className="text-sm text-ink-600">{area.comment}</div>
                     </div>
                   </div>
                 ))}
@@ -73,22 +75,22 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
 
           <div className="mt-5 grid gap-5 sm:grid-cols-2">
             {/* Strengths */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-emerald-400">
+            <div className="card card-pad">
+              <h2 className="section-label text-good">
                 Strengths
               </h2>
-              <ul className="mt-2 space-y-1.5 text-sm text-slate-300">
+              <ul className="mt-2 space-y-1.5 text-sm text-ink-900">
                 {debrief.topStrengths.map((s, i) => (
                   <li key={i}>• {s}</li>
                 ))}
               </ul>
             </div>
             {/* Weaknesses */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-rose-400">
+            <div className="card card-pad">
+              <h2 className="section-label text-bad">
                 Weaknesses
               </h2>
-              <ul className="mt-2 space-y-1.5 text-sm text-slate-300">
+              <ul className="mt-2 space-y-1.5 text-sm text-ink-900">
                 {debrief.topWeaknesses.map((w, i) => (
                   <li key={i}>
                     <span className="font-semibold">{subtopicName(w.subtopicId)}</span> — {w.why}
@@ -100,22 +102,22 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
 
           {/* Drill plan */}
           {debrief.drillPlan.length > 0 && (
-            <div className="mt-5 rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-5">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-indigo-300">
+            <div className="mt-5 rounded-lg border border-primary/30 bg-primary-tint p-5">
+              <h2 className="section-label text-primary">
                 Prescribed drills
               </h2>
               <div className="mt-3 space-y-2">
                 {debrief.drillPlan.map((d, i) => (
                   <div key={i} className="flex items-center justify-between gap-3 text-sm">
-                    <div className="text-slate-300">
-                      <span className="font-semibold text-slate-100">
+                    <div className="text-ink-900">
+                      <span className="font-semibold text-ink-900">
                         {subtopicName(d.subtopicId)}
                       </span>{" "}
                       at difficulty {d.difficulty} — {d.rationale}
                     </div>
                     <Link
                       href={`/train/new?mode=drill&subtopicId=${encodeURIComponent(d.subtopicId)}&difficulty=${d.difficulty}`}
-                      className="shrink-0 rounded bg-indigo-600 px-3 py-1.5 text-xs font-semibold hover:bg-indigo-500"
+                      className="shrink-0 btn btn-primary btn-sm"
                     >
                       Drill this
                     </Link>
@@ -126,21 +128,21 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
           )}
         </>
       ) : (
-        <p className="mt-6 text-sm text-slate-400">No debrief was generated for this session.</p>
+        <p className="mt-6 text-sm text-ink-600">No debrief was generated for this session.</p>
       )}
 
       {/* Per-question review */}
-      <h2 className="mt-8 text-lg font-semibold text-slate-100">Question review</h2>
+      <h2 className="mt-8 text-lg font-semibold text-ink-900">Question review</h2>
       <div className="mt-4 space-y-6">
         {state.questions.map((q) => (
-          <div key={q.id} className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
-            <div className="mb-3 flex items-center justify-between text-xs text-slate-500">
+          <div key={q.id} className="card card-pad">
+            <div className="mb-3 flex items-center justify-between text-xs text-ink-400">
               <span>
                 Q{q.askedIndex + 1} · {subtopicName(q.subtopicId)} · difficulty {q.difficulty}
               </span>
               <span className="uppercase">{q.status}</span>
             </div>
-            <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-900">
               {q.promptText}
             </p>
             {q.turns.length > 0 && (

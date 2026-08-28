@@ -1,10 +1,13 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
+import { Spinner } from "@/components/ui/Spinner";
 import { AREAS } from "@/content/taxonomy";
 import { PERSONAS } from "@/lib/llm/personas";
 import { voiceAvailable } from "@/lib/voice/openai";
 import { SetupForm, type SetupTaxonomy } from "./SetupForm";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "New session" };
 
 export default function NewSessionPage() {
   const taxonomy: SetupTaxonomy = {
@@ -17,7 +20,13 @@ export default function NewSessionPage() {
     personas: PERSONAS.map((p) => ({ id: p.id, name: p.name, blurb: p.blurb })),
   };
   return (
-    <Suspense>
+    <Suspense
+      fallback={
+        <div className="flex justify-center pt-24">
+          <Spinner label="Loading…" />
+        </div>
+      }
+    >
       <SetupForm taxonomy={taxonomy} voiceAvailable={voiceAvailable()} />
     </Suspense>
   );

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import * as repo from "@/lib/db/repo";
@@ -11,6 +12,7 @@ import {
 } from "@/components/LearnRunner";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "Coach" };
 
 export default async function LearnPage({ params, searchParams }: PageProps<"/learn/[fixitId]">) {
   const { fixitId } = await params;
@@ -26,7 +28,7 @@ export default async function LearnPage({ params, searchParams }: PageProps<"/le
   if (fixit.status === "resolved" && fixit.nextCheckAt === null) {
     return (
       <StatusCard title={view.concept} subtitle={`${view.subtopicName} · cleared`}>
-        <p className="text-sm text-emerald-300">
+        <p className="text-sm text-good">
           Cleared for good — you proved this across spaced checks.
         </p>
         <BackLink />
@@ -36,14 +38,14 @@ export default async function LearnPage({ params, searchParams }: PageProps<"/le
   if (fixit.status === "resolved" && !view.dueForCheck && !checkEarly) {
     return (
       <StatusCard title={view.concept} subtitle={`${view.subtopicName} · resolved`}>
-        <p className="text-sm text-slate-300">
+        <p className="text-sm text-ink-900">
           Proven. A quick spot-check resurfaces{" "}
           {fixit.nextCheckAt ? `on ${fixit.nextCheckAt.toLocaleDateString()}` : "soon"} to make sure
           it stuck.
         </p>
         <Link
           href={`/learn/${fixit.id}?early=1`}
-          className="mt-3 inline-block rounded bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-700"
+          className="btn btn-secondary mt-3"
         >
           Spot-check me now
         </Link>
@@ -133,9 +135,9 @@ function StatusCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto mt-12 max-w-md rounded-lg border border-slate-800 bg-slate-900 p-6">
-      <h1 className="text-lg font-semibold text-slate-100">{title}</h1>
-      <p className="mb-4 text-sm text-slate-500">{subtitle}</p>
+    <div className="mx-auto mt-12 max-w-md card p-6">
+      <h1 className="text-lg font-semibold text-ink-900">{title}</h1>
+      <p className="mb-4 text-sm text-ink-400">{subtitle}</p>
       {children}
     </div>
   );
@@ -143,7 +145,7 @@ function StatusCard({
 
 function BackLink() {
   return (
-    <Link href="/" className="mt-4 inline-block text-sm text-indigo-400 hover:text-indigo-300">
+    <Link href="/" className="mt-4 inline-block text-sm font-medium text-primary hover:text-primary-strong">
       ← Back to dashboard
     </Link>
   );

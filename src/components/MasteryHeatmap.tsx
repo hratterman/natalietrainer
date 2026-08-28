@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { tierFromMastery, type Tier } from "@/lib/score";
 
 export type HeatmapCell = {
   subtopicId: string;
@@ -15,17 +16,18 @@ export type HeatmapArea = {
   cells: HeatmapCell[];
 };
 
+/** Chip tint ramp — solid tinted chips, never dashed placeholders. */
+const CELL_TINT: Record<Tier, string> = {
+  good: "border-good/35 bg-good-tint text-good",
+  ok: "border-good/25 bg-good-tint/60 text-good/90",
+  warn: "border-warn/35 bg-warn-tint text-warn",
+  bad: "border-bad/35 bg-bad-tint text-bad",
+};
+const CELL_UNSEEN = "border-line bg-surface-2 text-ink-600";
+
 function cellClasses(cell: HeatmapCell): string {
-  if (cell.score === null) return "border-dashed border-slate-700 bg-slate-900 text-slate-600";
-  const base =
-    cell.score >= 0.8
-      ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-300"
-      : cell.score >= 0.6
-        ? "border-lime-500/40 bg-lime-500/10 text-lime-300"
-        : cell.score >= 0.4
-          ? "border-amber-500/40 bg-amber-500/10 text-amber-300"
-          : "border-rose-500/40 bg-rose-500/10 text-rose-300";
-  return cell.stale ? `${base} opacity-60` : base;
+  if (cell.score === null) return CELL_UNSEEN;
+  return CELL_TINT[tierFromMastery(cell.score)];
 }
 
 export function MasteryHeatmap({ areas }: { areas: HeatmapArea[] }) {
@@ -40,13 +42,11 @@ export function MasteryHeatmap({ areas }: { areas: HeatmapArea[] }) {
         if (tierAreas.length === 0) return null;
         return (
           <div key={tier}>
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              {label}
-            </h3>
+            <h3 className="section-label mb-2">{label}</h3>
             <div className="space-y-3">
               {tierAreas.map((area) => (
                 <div key={area.areaId}>
-                  <div className="mb-1.5 text-sm font-medium text-slate-300">{area.areaName}</div>
+                  <div className="mb-1.5 text-sm font-semibold text-ink-900">{area.areaName}</div>
                   <div className="flex flex-wrap gap-1.5">
                     {area.cells.map((cell) => (
                       <Link
@@ -54,14 +54,20 @@ export function MasteryHeatmap({ areas }: { areas: HeatmapArea[] }) {
                         href={`/train/new?mode=drill&subtopicId=${encodeURIComponent(cell.subtopicId)}`}
                         title={`${cell.subtopicName} — ${
                           cell.score === null
-                            ? "not attempted"
-                            : `${Math.round(cell.score * 100)}% mastery, ${cell.attempts} attempts${cell.stale ? ", stale" : ""}`
+                            ? "not attempted yet"
+                            : `${Math.round(cell.score * 100)}% mastery, ${cell.attempts} attempts${cell.stale ? ", getting stale" : ""}`
                         }`}
-                        className={`rounded border px-2 py-1 text-xs transition hover:brightness-125 ${cellClasses(cell)}`}
+                        className={`inline-flex items-center gap-1.5 rounded-control border px-2 py-1 text-xs transition-colors hover:border-primary ${cellClasses(cell)}`}
                       >
                         {cell.subtopicName}
                         {cell.score !== null && (
-                          <span className="ml-1.5 font-mono">{Math.round(cell.score * 100)}</span>
+                          <span className="font-mono tabular-nums">{Math.round(cell.score * 100)}</span>
+                        )}
+                        {cell.stale && (
+                          <span
+                            className="h-1.5 w-1.5 rounded-full border border-current"
+                            aria-label="stale"
+                          />
                         )}
                       </Link>
                     ))}
@@ -72,10 +78,27 @@ export function MasteryHeatmap({ areas }: { areas: HeatmapArea[] }) {
           </div>
         );
       })}
-      <p className="text-xs text-slate-600">
-        Click any subtopic to drill it. Faded = not practiced in over a week. Dashed = never
-        attempted.
-      </p>
+      {/* Legend with real swatches — no prose decoding required. */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-ink-600">
+        <LegendSwatch className={CELL_UNSEEN}>not tried</LegendSwatch>
+        <LegendSwatch className={CELL_TINT.bad}>&lt;40</LegendSwatch>
+        <LegendSwatch className={CELL_TINT.warn}>40–59</LegendSwatch>
+        <LegendSwatch className={CELL_TINT.ok}>60–79</LegendSwatch>
+        <LegendSwatch className={CELL_TINT.good}>80+</LegendSwatch>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full border border-ink-400" /> not practiced in a week
+        </span>
+        <span>· click any subtopic to drill it</span>
+      </div>
     </div>
+  );
+}
+
+function LegendSwatch({ className, children }: { className: string; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`inline-block h-3.5 w-3.5 rounded border ${className}`} />
+      {children}
+    </span>
   );
 }

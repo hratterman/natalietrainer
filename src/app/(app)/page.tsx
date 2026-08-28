@@ -66,34 +66,27 @@ function loadDashboardData() {
 
 function FixitRowView({ fixit, due = false }: { fixit: FixitView; due?: boolean }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded border border-slate-800 bg-slate-950/60 px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-control border border-line bg-surface-1 px-3 py-2">
       <div className="min-w-0">
-        <div className="flex items-center gap-2 text-sm text-slate-200">
-          <span className="truncate font-medium">{fixit.concept}</span>
+        <div className="flex items-center gap-2 text-sm text-ink-900">
+          <span className="truncate font-semibold">{fixit.concept}</span>
           {due && (
-            <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase text-amber-300">
+            <span className="shrink-0 rounded border border-warn/30 bg-warn-tint px-1.5 py-0.5 text-[10px] font-semibold uppercase text-warn">
               spot-check due
             </span>
           )}
           {fixit.attempts > 0 && (
-            <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
+            <span className="shrink-0 rounded bg-surface-2 px-1.5 py-0.5 text-[10px] text-ink-600">
               {fixit.attempts + 1}× missed
             </span>
           )}
         </div>
-        <div className="truncate text-xs text-slate-500">
+        <div className="truncate text-xs text-ink-400">
           {fixit.subtopicName}
           {fixit.corrections[0] ? ` — ${fixit.corrections[0]}` : fixit.gaps[0] ? ` — ${fixit.gaps[0]}` : ""}
         </div>
       </div>
-      <Link
-        href={`/learn/${fixit.id}`}
-        className={`shrink-0 rounded px-3 py-1.5 text-xs font-semibold ${
-          due
-            ? "bg-amber-600 text-white hover:bg-amber-500"
-            : "bg-indigo-600 text-white hover:bg-indigo-500"
-        }`}
-      >
+      <Link href={`/learn/${fixit.id}`} className="btn btn-primary btn-sm shrink-0">
         {due ? "Spot-check" : "Learn"}
       </Link>
     </div>
@@ -110,24 +103,18 @@ export default function DashboardPage() {
       {/* Hero row */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">
+          <h1 className="text-2xl font-bold tracking-tight text-ink-900">
             {hasAnyPractice ? "Welcome back, Natalie" : "Let's get you superday-ready, Natalie"}
           </h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-ink-600">
             Challenging technicals, a real interviewer across the table, and honest scoring.
           </p>
         </div>
-        <div className="flex gap-3">
-          <Link
-            href="/train/new"
-            className="rounded border border-slate-700 px-4 py-2 text-sm font-semibold text-slate-200 hover:border-slate-500"
-          >
+        <div className="flex gap-3" data-tour="modes">
+          <Link href="/train/new" className="btn btn-primary">
             New session
           </Link>
-          <Link
-            href="/train/new?mode=superday"
-            className="rounded bg-indigo-600 px-4 py-2 text-sm font-semibold hover:bg-indigo-500"
-          >
+          <Link href="/train/new?mode=superday" className="btn btn-secondary">
             Start superday sim
           </Link>
         </div>
@@ -137,7 +124,7 @@ export default function DashboardPage() {
       {activeSession && (
         <Link
           href={`/train/${activeSession.id}`}
-          className="block rounded-lg border border-amber-500/40 bg-amber-500/10 px-5 py-3 text-sm text-amber-300 hover:bg-amber-500/15"
+          className="block rounded-card border border-warn/40 bg-warn-tint px-5 py-3 text-sm font-medium text-warn hover:border-warn"
         >
           You have an unfinished {activeSession.mode} session — resume it →
         </Link>
@@ -145,11 +132,9 @@ export default function DashboardPage() {
 
       {/* Fix-it queue */}
       {(fixitsOpen.length > 0 || fixitsDue.length > 0) && (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-rose-300">
-            Fix-it queue
-          </h2>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="card card-pad border-warn/30" data-tour="fixits">
+          <h2 className="section-label text-warn">Fix-it queue</h2>
+          <p className="mt-1 text-xs text-ink-400">
             Concepts you missed. Learn them with the coach, then prove them on fresh questions.
           </p>
           <div className="mt-3 space-y-2">
@@ -165,33 +150,42 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-3" data-section="dashboard-main">
         {/* Heatmap */}
-        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5 lg:col-span-2">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
-            Mastery map
-          </h2>
-          <MasteryHeatmap areas={heatmapAreas} />
+        <div className="card card-pad lg:col-span-2" data-tour="mastery">
+          <h2 className="section-label mb-4">Mastery map</h2>
+          {hasAnyPractice ? (
+            <MasteryHeatmap areas={heatmapAreas} />
+          ) : (
+            <div className="rounded-card border border-dashed border-line-strong bg-surface-0 px-6 py-10 text-center">
+              <p className="text-sm font-semibold text-ink-900">Nothing on the map yet</p>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-ink-600">
+                Every subtopic you practice gets scored and tinted here, so you always know
+                what&apos;s solid and what needs work. Run one topic drill to light it up.
+              </p>
+              <Link href="/train/new?mode=drill" className="btn btn-primary mt-4">
+                Start a topic drill
+              </Link>
+            </div>
+          )}
         </div>
 
         <div className="space-y-6">
           {/* Weaknesses */}
-          <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
-            <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
-              Attack next
-            </h2>
+          <div className="card card-pad" data-tour="attack">
+            <h2 className="section-label mb-3">Attack next</h2>
             <div className="space-y-2">
               {weaknesses.map((w) => {
                 const ref = getSubtopic(w.subtopicId);
                 return (
                   <div key={w.subtopicId} className="flex items-center justify-between gap-2 text-sm">
-                    <div className="text-slate-300">
+                    <div className="text-ink-900">
                       {ref?.subtopic.name ?? w.subtopicId}
-                      <span className="ml-1.5 text-xs text-slate-600">
+                      <span className="ml-1.5 text-xs text-ink-400">
                         {w.unexplored ? "new" : w.stale ? "stale" : "weak"}
                       </span>
                     </div>
                     <Link
                       href={`/train/new?mode=drill&subtopicId=${encodeURIComponent(w.subtopicId)}`}
-                      className="shrink-0 rounded bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+                      className="btn btn-secondary btn-sm shrink-0"
                     >
                       Drill
                     </Link>
@@ -202,39 +196,37 @@ export default function DashboardPage() {
           </div>
 
           {/* Recent sessions */}
-          <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5">
+          <div className="card card-pad">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-                Recent sessions
-              </h2>
-              <Link href="/history" className="text-xs text-indigo-400 hover:text-indigo-300">
+              <h2 className="section-label">Recent sessions</h2>
+              <Link href="/history" className="text-xs font-medium text-primary hover:text-primary-strong">
                 All →
               </Link>
             </div>
             {sessions.length === 0 ? (
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-ink-400">
                 No sessions yet. Start with a topic drill to calibrate your levels.
               </p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {sessions.slice(0, 5).map((s) => {
                   const debrief = s.debriefJson as Debrief | null;
                   return (
                     <Link
                       key={s.id}
                       href={s.status === "active" ? `/train/${s.id}` : `/history/${s.id}`}
-                      className="flex items-center justify-between gap-2 rounded px-2 py-1.5 text-sm hover:bg-slate-800/60"
+                      className="flex items-center justify-between gap-2 rounded-control px-2 py-1.5 text-sm hover:bg-surface-2"
                     >
-                      <span className="capitalize text-slate-300">
+                      <span className="capitalize text-ink-900">
                         {s.mode}
-                        <span className="ml-2 text-xs text-slate-600">
+                        <span className="ml-2 text-xs normal-case text-ink-400">
                           {new Date(s.startedAt).toLocaleDateString()}
                         </span>
                       </span>
                       {debrief ? (
                         <ScoreBadge overall={debrief.overallScore} />
                       ) : (
-                        <span className="text-xs uppercase text-slate-600">{s.status}</span>
+                        <span className="text-xs uppercase text-ink-400">{s.status}</span>
                       )}
                     </Link>
                   );

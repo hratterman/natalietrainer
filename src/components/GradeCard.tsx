@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { RubricBars } from "./RubricBars";
 import { ScoreBadge } from "./ScoreBadge";
+import type { Tier } from "@/lib/score";
 
 export type GradeView = {
   accuracy: number;
@@ -30,7 +31,7 @@ export function GradeCard({
 }) {
   const [showModel, setShowModel] = useState(defaultOpen);
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+    <div className="card p-4">
       <div className="flex items-start gap-4">
         <ScoreBadge overall={grade.overall} size="lg" />
         <div className="flex-1">
@@ -44,35 +45,30 @@ export function GradeCard({
       </div>
 
       {learnHref && (
-        <Link
-          href={learnHref}
-          className="mt-4 block rounded border border-indigo-500/40 bg-indigo-500/10 px-4 py-2.5 text-center text-sm font-semibold text-indigo-300 hover:bg-indigo-500/20"
-        >
+        <Link href={learnHref} className="btn btn-primary mt-4 w-full">
           Learn this properly with the coach →
         </Link>
       )}
 
       {grade.strengths.length > 0 && (
-        <FeedbackList title="Strengths" items={grade.strengths} tone="text-emerald-400" />
+        <FeedbackList title="Strengths" items={grade.strengths} tier="good" />
       )}
-      {grade.gaps.length > 0 && (
-        <FeedbackList title="Gaps" items={grade.gaps} tone="text-amber-400" />
-      )}
+      {grade.gaps.length > 0 && <FeedbackList title="Gaps" items={grade.gaps} tier="warn" />}
       {grade.corrections.length > 0 && (
-        <FeedbackList title="Corrections" items={grade.corrections} tone="text-rose-400" />
+        <FeedbackList title="Corrections" items={grade.corrections} tier="bad" />
       )}
       {grade.deliveryFeedback && grade.deliveryFeedback.length > 0 && (
-        <FeedbackList title="Delivery" items={grade.deliveryFeedback} tone="text-sky-400" />
+        <FeedbackList title="Delivery" items={grade.deliveryFeedback} tier="ok" />
       )}
 
       <button
         onClick={() => setShowModel((v) => !v)}
-        className="mt-4 text-sm text-indigo-400 hover:text-indigo-300"
+        className="mt-4 text-sm font-medium text-primary hover:text-primary-strong"
       >
         {showModel ? "Hide model answer" : "Show model answer"}
       </button>
       {showModel && (
-        <div className="mt-2 whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-3 text-sm leading-relaxed text-slate-300">
+        <div className="mt-2 whitespace-pre-wrap rounded-control border border-line bg-surface-2 p-3 text-sm leading-relaxed text-ink-900">
           {grade.modelAnswer}
         </div>
       )}
@@ -80,24 +76,26 @@ export function GradeCard({
   );
 }
 
-function FeedbackList({
-  title,
-  items,
-  tone,
-}: {
-  title: string;
-  items: string[];
-  tone: string;
-}) {
+const RULE: Record<Tier, string> = {
+  good: "border-good/40",
+  ok: "border-primary/40",
+  warn: "border-warn/40",
+  bad: "border-bad/40",
+};
+const TITLE: Record<Tier, string> = {
+  good: "text-good",
+  ok: "text-primary",
+  warn: "text-warn",
+  bad: "text-bad",
+};
+
+function FeedbackList({ title, items, tier }: { title: string; items: string[]; tier: Tier }) {
   return (
-    <div className="mt-4">
-      <h4 className={`text-xs font-semibold uppercase tracking-wide ${tone}`}>{title}</h4>
-      <ul className="mt-1 space-y-1 text-sm text-slate-300">
+    <div className={`mt-4 border-l-2 pl-3 ${RULE[tier]}`}>
+      <h4 className={`text-xs font-semibold uppercase tracking-wide ${TITLE[tier]}`}>{title}</h4>
+      <ul className="mt-1 space-y-1 text-sm text-ink-900">
         {items.map((item, i) => (
-          <li key={i} className="flex gap-2">
-            <span className="text-slate-600">•</span>
-            <span>{item}</span>
-          </li>
+          <li key={i}>{item}</li>
         ))}
       </ul>
     </div>

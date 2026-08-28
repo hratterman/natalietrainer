@@ -35,7 +35,7 @@ export function CountUpTimer({
   }, [running, onTick]);
 
   return (
-    <span className="font-mono text-sm text-slate-400" suppressHydrationWarning>
+    <span className="font-mono text-sm tabular-nums text-ink-600" suppressHydrationWarning>
       {fmt(Math.floor(elapsed / 1000))}
     </span>
   );
@@ -79,7 +79,7 @@ export function CountdownTimer({
   const urgent = remaining <= 10;
   return (
     <span
-      className={`font-mono text-lg font-semibold ${urgent ? "text-rose-400" : "text-slate-200"}`}
+      className={`font-mono text-lg font-semibold tabular-nums ${urgent ? "text-bad" : "text-ink-900"}`}
       suppressHydrationWarning
     >
       {fmt(remaining)}
