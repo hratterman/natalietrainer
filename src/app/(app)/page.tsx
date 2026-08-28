@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import * as repo from "@/lib/db/repo";
+import { TOUR_COOKIE } from "@/lib/auth";
+import { TourLauncher } from "@/components/tour/TourLauncher";
 import { AREAS, getSubtopic } from "@/content/taxonomy";
 import { isStale, rankWeaknesses } from "@/lib/mastery";
 import { MasteryHeatmap, type HeatmapArea } from "@/components/MasteryHeatmap";
@@ -93,10 +96,11 @@ function FixitRowView({ fixit, due = false }: { fixit: FixitView; due?: boolean 
   );
 }
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const { heatmapAreas, weaknesses, sessions, hasAnyPractice, fixitsOpen, fixitsDue } =
     loadDashboardData();
   const activeSession = sessions.find((s) => s.status === "active");
+  const tourDone = (await cookies()).get(TOUR_COOKIE)?.value === "done";
 
   return (
     <div className="space-y-8">
@@ -109,6 +113,7 @@ export default function DashboardPage() {
           <p className="mt-1 text-sm text-ink-600">
             Challenging technicals, a real interviewer across the table, and honest scoring.
           </p>
+          <TourLauncher autoStart={!tourDone} />
         </div>
         <div className="flex gap-3" data-tour="modes">
           <Link href="/train/new" className="btn btn-primary">
