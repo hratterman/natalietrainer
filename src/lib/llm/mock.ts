@@ -48,6 +48,7 @@ export function mockGrade(answerLength: number, voice = false): Grade {
     completeness: Math.max(2, base - 1),
     structure: Math.min(10, base + 1),
     delivery: voice ? Math.max(1, base - 2) : null,
+    missedConcept: base < 7 ? "[MOCK] balance check tie-out" : null,
     deliveryFeedback: voice
       ? [
           "[MOCK] Lead with the roadmap before the walk.",

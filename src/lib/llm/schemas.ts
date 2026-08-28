@@ -66,6 +66,12 @@ export const gradeSchema = z.object({
     .describe(
       "Spoken answers only: specific delivery feedback (framing, fillers, pace, composure). Empty array for typed transcripts.",
     ),
+  missedConcept: z
+    .string()
+    .nullable()
+    .describe(
+      "If the answer fell short of the bar: the ONE core concept or mechanic the candidate most needs to relearn, as a 3-8 word label (e.g. 'deferred tax impact on the cash walk'). Null when the answer met the bar.",
+    ),
 });
 export type Grade = z.infer<typeof gradeSchema>;
 

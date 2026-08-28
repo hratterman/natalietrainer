@@ -12,6 +12,7 @@ import { generateQuestion, generateRapidBatch } from "@/lib/llm/generateQuestion
 import { gradeQuestion } from "@/lib/llm/grade";
 import { generateDebrief } from "@/lib/llm/debrief";
 import type { Debrief, Grade } from "@/lib/llm/schemas";
+import { conceptFrom, qualifiesAsMiss } from "@/lib/fixit";
 
 /** Hard caps on interviewer follow-ups per question, by mode. */
 export const FOLLOW_UP_CAPS: Record<Mode, number> = {
@@ -221,8 +222,13 @@ export function followUpsUsed(questionId: string): number {
     ).length;
 }
 
-/** Grade an answered question and persist the grade + mastery update. */
-export async function gradeAndRecord(questionId: string): Promise<Grade & { alreadyGraded: boolean }> {
+export type GradeResult = Grade & { alreadyGraded: boolean; fixitId: string | null };
+
+/**
+ * Grade an answered question, persist the grade + mastery update, and — for
+ * qualifying misses in playable modes — record a fixit in the learn queue.
+ */
+export async function gradeAndRecord(questionId: string): Promise<GradeResult> {
   const existing = repo.getGrade(questionId);
   if (existing) {
     return {
@@ -236,7 +242,9 @@ export async function gradeAndRecord(questionId: string): Promise<Grade & { alre
       gaps: existing.feedbackJson.gaps,
       corrections: existing.feedbackJson.corrections,
       deliveryFeedback: existing.feedbackJson.delivery ?? [],
+      missedConcept: null,
       alreadyGraded: true,
+      fixitId: repo.getFixitBySourceQuestion(questionId)?.id ?? null,
     };
   }
   const question = repo.getQuestion(questionId);
@@ -260,7 +268,21 @@ export async function gradeAndRecord(questionId: string): Promise<Grade & { alre
       ...(voice && grade.deliveryFeedback.length > 0 ? { delivery: grade.deliveryFeedback } : {}),
     },
   });
-  return { ...grade, alreadyGraded: false };
+
+  let fixitId: string | null = null;
+  if (session?.mode !== "learn" && qualifiesAsMiss(grade)) {
+    const subtopicName = getSubtopic(question.subtopicId)?.subtopic.name ?? question.subtopicId;
+    const fixit = repo.upsertFixitForMiss({
+      sourceQuestionId: question.id,
+      subtopicId: question.subtopicId,
+      archetypeId: question.archetypeId,
+      difficulty: question.difficulty,
+      concept: conceptFrom(grade, subtopicName),
+      detail: { gaps: grade.gaps, corrections: grade.corrections },
+    });
+    fixitId = fixit.id;
+  }
+  return { ...grade, alreadyGraded: false, fixitId };
 }
 
 /**

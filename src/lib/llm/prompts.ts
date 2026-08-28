@@ -127,6 +127,8 @@ Format-specific anchors:
 
 The modelAnswer must be the complete answer a top candidate would give, with all arithmetic worked. corrections must quote what the candidate said and give the fix with the why. The scratchpad is context for diagnosing errors — grade the spoken/typed answer, not the scratchpad.
 
+missedConcept: when the answer falls short of the bar (overall below 70, or the accuracy anchor at 5 or less), name the ONE core concept or mechanic the candidate most needs to relearn — a short 3-8 word label like "deferred tax impact on the cash walk", not a sentence. When the answer meets the bar, set it to null.
+
 SPOKEN ANSWERS (when the transcript is marked as spoken): also score the delivery dimension (0-10) and give deliveryFeedback:
 - delivery 10 = answers first with a roadmap then executes it ("Three effects — income statement first..."), even confident pace around 130-170 words per minute, at most ~1 filler per 100 words, and if interrupted, recovered the thread unprompted and finished stronger.
 - delivery 5 = right content but the lede is buried, hedge-y openings ("I think maybe..."), noticeable filler or pace collapse under pressure.

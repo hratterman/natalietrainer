@@ -24,8 +24,9 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         { status: 409 },
       );
     }
-    const grade = await gradeAndRecord(question.id);
-    return NextResponse.json({ grade });
+    const { fixitId, alreadyGraded, ...grade } = await gradeAndRecord(question.id);
+    void alreadyGraded;
+    return NextResponse.json({ grade, fixitId });
   } catch (err) {
     return errorResponse(err);
   }

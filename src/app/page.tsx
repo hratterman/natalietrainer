@@ -4,6 +4,7 @@ import { AREAS, getSubtopic } from "@/content/taxonomy";
 import { isStale, rankWeaknesses } from "@/lib/mastery";
 import { MasteryHeatmap, type HeatmapArea } from "@/components/MasteryHeatmap";
 import { ScoreBadge } from "@/components/ScoreBadge";
+import { fixitView, type FixitView } from "@/lib/api/fixitView";
 import type { Debrief } from "@/lib/llm/schemas";
 
 export const dynamic = "force-dynamic";
@@ -46,11 +47,56 @@ function loadDashboardData() {
   ).slice(0, 5);
 
   const sessions = repo.listSessions(8);
-  return { heatmapAreas, weaknesses, sessions, hasAnyPractice: masteryRows.length > 0 };
+  const fixitsActive = repo.listActiveFixits().map(fixitView);
+  return {
+    heatmapAreas,
+    weaknesses,
+    sessions,
+    hasAnyPractice: masteryRows.length > 0,
+    fixitsOpen: fixitsActive.filter((f) => f.status === "open"),
+    fixitsDue: fixitsActive.filter((f) => f.dueForCheck),
+  };
+}
+
+function FixitRowView({ fixit, due = false }: { fixit: FixitView; due?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded border border-slate-800 bg-slate-950/60 px-3 py-2">
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-sm text-slate-200">
+          <span className="truncate font-medium">{fixit.concept}</span>
+          {due && (
+            <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] uppercase text-amber-300">
+              spot-check due
+            </span>
+          )}
+          {fixit.attempts > 0 && (
+            <span className="shrink-0 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
+              {fixit.attempts + 1}× missed
+            </span>
+          )}
+        </div>
+        <div className="truncate text-xs text-slate-500">
+          {fixit.subtopicName}
+          {fixit.corrections[0] ? ` — ${fixit.corrections[0]}` : fixit.gaps[0] ? ` — ${fixit.gaps[0]}` : ""}
+        </div>
+      </div>
+      <Link
+        href={`/learn/${fixit.id}`}
+        className={`shrink-0 rounded px-3 py-1.5 text-xs font-semibold ${
+          due
+            ? "bg-amber-600 text-white hover:bg-amber-500"
+            : "bg-indigo-600 text-white hover:bg-indigo-500"
+        }`}
+      >
+        {due ? "Spot-check" : "Learn"}
+      </Link>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
-  const { heatmapAreas, weaknesses, sessions, hasAnyPractice } = loadDashboardData();
+  const { heatmapAreas, weaknesses, sessions, hasAnyPractice, fixitsOpen, fixitsDue } =
+    loadDashboardData();
   const activeSession = sessions.find((s) => s.status === "active");
 
   return (
@@ -91,7 +137,27 @@ export default function DashboardPage() {
         </Link>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      {/* Fix-it queue */}
+      {(fixitsOpen.length > 0 || fixitsDue.length > 0) && (
+        <div className="rounded-lg border border-rose-500/30 bg-rose-500/5 p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-rose-300">
+            Fix-it queue
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Concepts you missed. Learn them with the coach, then prove them on fresh questions.
+          </p>
+          <div className="mt-3 space-y-2">
+            {fixitsDue.map((f) => (
+              <FixitRowView key={f.id} fixit={f} due />
+            ))}
+            {fixitsOpen.map((f) => (
+              <FixitRowView key={f.id} fixit={f} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-3" data-section="dashboard-main">
         {/* Heatmap */}
         <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-5 lg:col-span-2">
           <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-slate-400">
