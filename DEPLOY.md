@@ -8,7 +8,7 @@ An investment-banking interview trainer built for one user (Natalie). It generat
 
 Two things follow from "built for one user" and shape everything below:
 
-1. **The app has no login.** Anyone who can reach it can run interview sessions (spending real API money) and read Natalie's progress. It must never be exposed to the open internet without access control in front of it.
+1. **The only login is a PIN.** The app ships with a built-in PIN gate (default **1234** — change it via `APP_PIN`, see below). That keeps casual visitors out, but a 4-digit PIN is not internet-grade security on its own: still put basic auth or a private network in front of it (step 5).
 2. **The SQLite file is all of her progress.** Lose it and the mastery history, fix-it queue, and session record are gone. Back it up.
 
 ## 1. Get the code
@@ -33,6 +33,7 @@ Edit `.env.local`:
 | --- | --- | --- |
 | `ANTHROPIC_API_KEY` | **Yes** | Powers question generation, interviewing, grading. Without it, nothing real works. |
 | `OPENAI_API_KEY` | Only for voice mode | Used exclusively for speech-to-text and the interviewer's voice. Skip it and the app runs typed-only; the voice toggle greys out. |
+| `APP_PIN` | Strongly recommended | The login PIN. Defaults to `1234` if unset — set your own before exposing the app. Changing it requires an app restart and signs out existing browsers. |
 | `LLM_MOCK`, `VOICE_FAKE` | **Never in production** | Offline test doubles. If either is set, sessions look real but are canned fixtures. Leave them out of `.env.local`. |
 | `DATABASE_PATH` | No | Defaults to `data/natalie.db` relative to the working directory. |
 
@@ -88,7 +89,7 @@ A LaunchAgent starts at login; if the mini runs headless with no auto-login, use
 
 Run it on a subdomain (e.g. `trainer.` + the site's domain) behind a reverse proxy. Two hard requirements:
 
-> **Access control is mandatory.** The app has zero authentication. Unprotected, anyone who finds the URL can burn the Anthropic/OpenAI keys and read Natalie's data. Minimum bar: HTTP basic auth at the proxy. Better: keep it off the public internet entirely with Tailscale (`tailscale serve`), or Cloudflare Tunnel + Access if you want email-gated login.
+> **Set a real PIN, and add a second lock.** The built-in PIN gate (`APP_PIN`) covers every page and API route, but four digits alone won't survive a determined stranger. Before going public: set `APP_PIN` to something that isn't 1234, and add either HTTP basic auth at the proxy (below) or keep the app off the public internet entirely with Tailscale (`tailscale serve`) / Cloudflare Tunnel + Access. Defense in depth is cheap here.
 >
 > **Real HTTPS is required for voice mode.** The browser only grants mic access and WebRTC in a secure context. `localhost` is exempt, but on a domain it must be genuine TLS.
 

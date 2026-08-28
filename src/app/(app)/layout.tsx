@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/Logo";
 import { NavLink } from "@/components/NavLink";
+import { LockButton } from "@/components/LockButton";
 
 /** App shell: every signed-in page gets the nav; /login lives outside this group. */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </NavLink>
           <NavLink href="/train">Train</NavLink>
           <NavLink href="/history">History</NavLink>
-          <div className="ml-auto" />
+          <div className="ml-auto">
+            <LockButton />
+          </div>
         </nav>
       </header>
       <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>

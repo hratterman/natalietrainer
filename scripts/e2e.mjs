@@ -17,7 +17,7 @@ import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromiumLaunchOptions, loadPlaywright } from "../e2e/helpers.mjs";
+import { chromiumLaunchOptions, defaultCookies, loadPlaywright } from "../e2e/helpers.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const artifactsDir = path.join(root, "e2e", ".artifacts");
@@ -64,6 +64,7 @@ async function main() {
     ...process.env,
     LLM_MOCK: "1",
     VOICE_FAKE: "1",
+    APP_PIN: "1234",
     DATABASE_PATH: path.join(dbDir, "e2e.db"),
     NEXT_TELEMETRY_DISABLED: "1",
   };
@@ -112,6 +113,8 @@ async function main() {
       const allow = (mod.allowConsole ?? []).map((p) => (p instanceof RegExp ? p : new RegExp(p)));
 
       const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+      // Pre-seed the PIN-gate + tour cookies unless the scenario tests them.
+      if (!mod.noAuth) await context.addCookies(defaultCookies(base));
       const page = await context.newPage();
       page.setDefaultTimeout(30000);
       const consoleErrors = [];

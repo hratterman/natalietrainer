@@ -5,11 +5,29 @@
  * voice toggle defaults ON in setup — typed scenarios switch it off through
  * the UI, exactly as a user would.
  */
+import crypto from "node:crypto";
 import fs from "node:fs";
 
 export const SHORT_ANSWER = "It goes down I think."; // < 70 under the mock → miss
 export const LONG_ANSWER =
   "Start on the income statement: pre-tax income falls ten dollars, taxes fall two fifty at the twenty five percent rate, so net income falls seven fifty. On the cash flow statement net income is down seven fifty but the ten dollars is added back as a non-cash charge, so operating cash rises two fifty. On the balance sheet cash is up two fifty, PP&E is down ten, and retained earnings absorbs the seven fifty drop, so both sides tie. Net change in cash is positive two fifty because the tax shield exceeds nothing else in the walk.";
+
+/** Mirrors src/lib/auth.ts expectedAuthToken — keep the derivation in sync. */
+export function authCookieValue(pin = "1234") {
+  return crypto.createHash("sha256").update(`natalietrainer:v1:${pin}`).digest("hex");
+}
+
+/**
+ * Cookies pre-seeded into every scenario's context: the PIN-gate auth cookie,
+ * plus the tour-done flag so the onboarding overlay stays out of scenarios
+ * that aren't about it. Scenario 48 opts out via `export const noAuth = true`.
+ */
+export function defaultCookies(base) {
+  return [
+    { name: "nt_auth", value: authCookieValue(), url: base, httpOnly: true, sameSite: "Lax" },
+    { name: "nt_tour", value: "done", url: base, sameSite: "Lax" },
+  ];
+}
 
 /** Load playwright from the project if installed, else from a global install. */
 export async function loadPlaywright() {
