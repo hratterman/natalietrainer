@@ -346,12 +346,16 @@ export function getSessionWithTranscript(sessionId: string): SessionWithTranscri
   };
 }
 
-/** The currently-active question of a session, if any. */
+/**
+ * The current question of a session: the lowest-index question still active.
+ * (Rapid-fire creates its whole batch upfront, so "current" is the first
+ * unanswered one.)
+ */
 export function getActiveQuestion(sessionId: string): QuestionRow | undefined {
   return getDb()
     .select()
     .from(questions)
     .where(and(eq(questions.sessionId, sessionId), eq(questions.status, "active")))
-    .orderBy(desc(questions.askedIndex))
+    .orderBy(asc(questions.askedIndex))
     .get();
 }
