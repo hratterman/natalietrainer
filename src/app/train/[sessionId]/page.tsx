@@ -27,6 +27,7 @@ export default async function TrainSessionPage({
         secondsPerQuestion: state.session.configJson.secondsPerQuestion,
         questionCount: state.session.configJson.questionCount,
         rounds: state.session.configJson.rounds,
+        voiceMode: state.session.configJson.voiceMode === true,
       },
     },
     questions: state.questions.map((q) => ({
@@ -45,6 +46,7 @@ export default async function TrainSessionPage({
         content: t.content,
         scratchpad: t.scratchpad,
         elapsedMs: t.elapsedMs,
+        interruption: t.interruption,
       })),
     })),
     activeQuestionId: active?.id ?? null,
@@ -54,6 +56,7 @@ export default async function TrainSessionPage({
     subtopicNames: Object.fromEntries(
       allSubtopics().map(({ subtopic }) => [subtopic.id, subtopic.name]),
     ),
+    voiceFake: process.env.VOICE_FAKE === "1",
   };
 
   return <SessionRunner initial={initial} />;

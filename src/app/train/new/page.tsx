@@ -1,7 +1,10 @@
 import { Suspense } from "react";
 import { AREAS } from "@/content/taxonomy";
 import { PERSONAS } from "@/lib/llm/personas";
+import { voiceAvailable } from "@/lib/voice/openai";
 import { SetupForm, type SetupTaxonomy } from "./SetupForm";
+
+export const dynamic = "force-dynamic";
 
 export default function NewSessionPage() {
   const taxonomy: SetupTaxonomy = {
@@ -15,7 +18,7 @@ export default function NewSessionPage() {
   };
   return (
     <Suspense>
-      <SetupForm taxonomy={taxonomy} />
+      <SetupForm taxonomy={taxonomy} voiceAvailable={voiceAvailable()} />
     </Suspense>
   );
 }

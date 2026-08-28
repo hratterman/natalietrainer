@@ -45,7 +45,13 @@ const DEFAULT_SUPERDAY_ROUNDS = [
   { personaId: "grinder", focusAreaId: "lbo", questionCount: 3 },
 ];
 
-export function SetupForm({ taxonomy }: { taxonomy: SetupTaxonomy }) {
+export function SetupForm({
+  taxonomy,
+  voiceAvailable,
+}: {
+  taxonomy: SetupTaxonomy;
+  voiceAvailable: boolean;
+}) {
   const router = useRouter();
   const search = useSearchParams();
   const prefillSubtopic = search.get("subtopicId");
@@ -68,6 +74,7 @@ export function SetupForm({ taxonomy }: { taxonomy: SetupTaxonomy }) {
   const [questionCount, setQuestionCount] = useState(mode === "rapid" ? 10 : 5);
   const [personaId, setPersonaId] = useState("quant");
   const [secondsPerQuestion, setSecondsPerQuestion] = useState(45);
+  const [voiceMode, setVoiceMode] = useState(voiceAvailable);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,9 +91,11 @@ export function SetupForm({ taxonomy }: { taxonomy: SetupTaxonomy }) {
       areaIds: mode === "drill" ? [] : areaIds,
       difficulty,
       questionCount: mode === "superday" ? 12 : questionCount,
-      personaId: mode === "mock" || mode === "superday" ? personaId : null,
+      personaId: mode === "mock" || mode === "superday" || mode === "drill" ? personaId : null,
       secondsPerQuestion: mode === "rapid" ? secondsPerQuestion : null,
       rounds: mode === "superday" ? DEFAULT_SUPERDAY_ROUNDS : null,
+      // Rapid-fire stays typed: silence detection fights the hard countdown.
+      voiceMode: mode !== "rapid" && voiceAvailable && voiceMode,
     };
     try {
       const res = await fetch("/api/sessions", {
@@ -132,6 +141,39 @@ export function SetupForm({ taxonomy }: { taxonomy: SetupTaxonomy }) {
           </button>
         ))}
       </div>
+
+      {/* Voice toggle */}
+      {mode !== "rapid" && (
+        <button
+          onClick={() => voiceAvailable && setVoiceMode((v) => !v)}
+          disabled={!voiceAvailable}
+          className={`mt-4 flex w-full items-center justify-between rounded-lg border p-4 text-left transition ${
+            voiceMode && voiceAvailable
+              ? "border-indigo-500 bg-indigo-500/10"
+              : "border-slate-800 bg-slate-900"
+          } ${voiceAvailable ? "hover:border-slate-600" : "cursor-not-allowed opacity-60"}`}
+        >
+          <div>
+            <div className="font-semibold text-slate-100">🎙 Voice interview</div>
+            <div className="mt-1 text-sm text-slate-400">
+              {voiceAvailable
+                ? "Speak your answers out loud to an interviewer with a real voice. Silence ends your turn — no editing, like the real thing."
+                : "Requires OPENAI_API_KEY in .env.local — voice powers the mic transcription and the interviewer's voice."}
+            </div>
+          </div>
+          <span
+            className={`ml-4 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${
+              voiceMode && voiceAvailable ? "bg-indigo-500" : "bg-slate-700"
+            }`}
+          >
+            <span
+              className={`h-5 w-5 rounded-full bg-white transition ${
+                voiceMode && voiceAvailable ? "translate-x-5" : "translate-x-0.5"
+              }`}
+            />
+          </span>
+        </button>
+      )}
 
       {/* Mode-specific options */}
       <div className="mt-6 space-y-6 rounded-lg border border-slate-800 bg-slate-900 p-5">
@@ -250,7 +292,7 @@ export function SetupForm({ taxonomy }: { taxonomy: SetupTaxonomy }) {
                 className="mt-2 w-24 rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-200"
               />
             </div>
-            {mode === "mock" && (
+            {(mode === "mock" || (mode === "drill" && voiceMode && voiceAvailable)) && (
               <div>
                 <label className="block text-sm font-semibold text-slate-200">Interviewer</label>
                 <select

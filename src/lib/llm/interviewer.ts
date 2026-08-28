@@ -88,7 +88,10 @@ export async function* interviewerTurn(input: {
   }
 
   if (isMock()) {
-    const followUpsUsed = input.priorTurns.filter((t) => t.role === "interviewer").length;
+    // Openings (turnIndex 0) and canned interjections don't consume follow-ups.
+    const followUpsUsed = input.priorTurns.filter(
+      (t) => t.role === "interviewer" && t.turnIndex > 0 && t.interruption !== "interjection",
+    ).length;
     const cap = input.mode === "drill" ? 1 : input.mode === "rapid" ? 0 : 3;
     const raw = mockInterviewerReply(followUpsUsed, cap);
     const { action, spoken } = splitControlLine(raw);

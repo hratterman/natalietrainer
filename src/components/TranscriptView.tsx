@@ -4,6 +4,13 @@ export type TurnView = {
   content: string;
   scratchpad?: string | null;
   elapsedMs?: number | null;
+  interruption?: string | null;
+};
+
+const INTERRUPTION_LABELS: Record<string, string> = {
+  cut_off: "cut off",
+  barge_in: "talked over the interviewer",
+  interjection: "interrupting",
 };
 
 export function TranscriptView({ turns }: { turns: TurnView[] }) {
@@ -31,6 +38,11 @@ export function TurnBubble({ turn }: { turn: TurnView }) {
           {isInterviewer ? "Interviewer" : "You"}
           {turn.elapsedMs != null && (
             <span className="normal-case">answered in {Math.round(turn.elapsedMs / 1000)}s</span>
+          )}
+          {turn.interruption && INTERRUPTION_LABELS[turn.interruption] && (
+            <span className="rounded bg-rose-500/15 px-1.5 py-0.5 normal-case text-rose-300">
+              {INTERRUPTION_LABELS[turn.interruption]}
+            </span>
           )}
         </div>
         {turn.content}
