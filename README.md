@@ -52,6 +52,14 @@ Wear headphones (echo cancellation keeps the mic hot for barge-in). Rapid-fire s
 
 **Manual voice checklist** (after changing voice code, with real keys): mic permission + voice check captions echo what you say · silence auto-submits at the persona's window · talking over the interviewer stops the audio · rambling number-less at the trader gets you cut off, with the duck-in feeling natural · persona voices clearly distinct · killing the network mid-session degrades to typing without losing the session.
 
+## Learning mode — actually fixing what you miss
+
+Getting a question wrong isn't a dead end. Every meaningful miss (below 70 overall, or accuracy ≤ 5) lands in the dashboard's **Fix-it queue** with the exact concept the grader says you need to relearn.
+
+- **Socratic coach**: open a fix-it and a private coach — anchored to the exact question, *your* exact answer, and the grader's corrections — teaches it properly: quotes what you said, starts from what you got right, and makes you do the reasoning one step at a time. Ask it anything.
+- **Prove it to close**: no credit for nodding along. When you (or the coach) think you've got it, you must beat **two fresh questions of the same archetype in a row**, graded cold by the normal grader (they feed your mastery too). Fail one and you're back in the lesson — the coach knows exactly what you missed.
+- **Spaced spot-checks**: resolved concepts resurface for a one-question spot-check 2 days later, then 7 days later. Pass both and it's cleared for good; miss one and it reopens with your newest miss as the starting point.
+
 ## How it stays hard and fresh
 
 Every question is generated from a checked-in **archetype** (what to test, what to vary, the difficulty bar, sample superday questions) plus your recent question history, so questions don't repeat. Difficulty adapts per subtopic: two strong answers in a row step you up, a miss steps you down — with difficulty 5 defined as genuinely superday-hard: multi-part, adversarial twist, the "why" behind every step.

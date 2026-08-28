@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import { ControlLineBuffer, parseControlLine, splitControlLine } from "./controlLine";
 
 describe("parseControlLine", () => {
-  it("parses both actions", () => {
+  it("parses all actions", () => {
     expect(parseControlLine('{"action":"followup"}')).toBe("followup");
     expect(parseControlLine('{"action":"wrapup"}')).toBe("wrapup");
+    expect(parseControlLine('{"action":"ask"}')).toBe("ask");
+    expect(parseControlLine('{"action":"coach"}')).toBe("coach");
+    expect(parseControlLine('{"action":"check"}')).toBe("check");
   });
 
   it("rejects malformed lines", () => {
@@ -55,6 +58,14 @@ describe("ControlLineBuffer", () => {
     const buf = new ControlLineBuffer();
     buf.push('{"action":"wrapup"}');
     expect(buf.result()).toEqual({ action: "wrapup", spoken: "" });
+  });
+});
+
+describe("defaultAction fallback", () => {
+  it("malformed coach output falls back to the coach action", () => {
+    const buf = new ControlLineBuffer("coach");
+    buf.push("Let me explain that differently.\nThe tax shield works like this.");
+    expect(buf.result().action).toBe("coach");
   });
 });
 

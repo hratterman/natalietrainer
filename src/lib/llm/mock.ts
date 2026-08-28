@@ -85,6 +85,18 @@ export function mockInterviewerReply(turnCount: number, maxFollowUps: number): s
   return `{"action":"followup"}\n${followups[turnCount % followups.length]}`;
 }
 
+export function mockCoachReply(coachTurnsSoFar: number, concept: string): string {
+  if (coachTurnsSoFar >= 3) {
+    return `{"action":"check"}\n[MOCK coach] Alright, you've got it — let's prove it on a fresh one.`;
+  }
+  const lines = [
+    `[MOCK coach] Good news first: your statement order was right. Now, on ${concept} — walk me through just the first step: what happens on the income statement?`,
+    `[MOCK coach] Exactly. So if that's the income statement, what does the add-back on the cash flow statement look like?`,
+    `[MOCK coach] Right — and the balance sheet ties because retained earnings absorbs the difference. Say the whole chain back to me in one go.`,
+  ];
+  return `{"action":"coach"}\n${lines[coachTurnsSoFar % lines.length]}`;
+}
+
 export function mockDebrief(input: {
   areaScores: { areaId: string; score: number }[];
   weakestSubtopics: string[];

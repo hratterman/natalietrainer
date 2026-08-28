@@ -106,6 +106,10 @@ export type NextQuestionResult =
 export async function nextQuestion(sessionId: string): Promise<NextQuestionResult> {
   const session = repo.getSession(sessionId);
   if (!session) throw new Error(`session ${sessionId} not found`);
+  if (session.mode === "learn") {
+    const { nextLearnQuestion } = await import("./learn");
+    return nextLearnQuestion(session);
+  }
   const config = session.configJson;
 
   const existing = repo.getActiveQuestion(sessionId);
@@ -270,7 +274,10 @@ export async function gradeAndRecord(questionId: string): Promise<GradeResult> {
   });
 
   let fixitId: string | null = null;
-  if (session?.mode !== "learn" && qualifiesAsMiss(grade)) {
+  if (session?.mode === "learn") {
+    const { onLearnQuestionGraded } = await import("./learn");
+    fixitId = onLearnQuestionGraded(session, question, grade);
+  } else if (qualifiesAsMiss(grade)) {
     const subtopicName = getSubtopic(question.subtopicId)?.subtopic.name ?? question.subtopicId;
     const fixit = repo.upsertFixitForMiss({
       sourceQuestionId: question.id,

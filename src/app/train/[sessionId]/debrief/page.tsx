@@ -159,6 +159,10 @@ export default async function DebriefPage({ params }: PageProps<"/train/[session
                     corrections: q.grade.feedbackJson.corrections,
                     deliveryFeedback: q.grade.feedbackJson.delivery,
                   }}
+                  learnHref={(() => {
+                    const fixit = repo.getFixitBySourceQuestion(q.id);
+                    return fixit && fixit.status === "open" ? `/learn/${fixit.id}` : null;
+                  })()}
                 />
               </div>
             )}

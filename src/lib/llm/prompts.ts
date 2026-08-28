@@ -48,6 +48,7 @@ const MODE_BLOCKS: Record<string, string> = {
   mock: `MODE: Full mock interview. Treat every question as live superday material. Use your follow-up budget: probe until you know whether the candidate actually understands. Wrap up once you do, or after 3 follow-ups.`,
   drill: `MODE: Topic drill. The candidate is building mechanics in one area. Ask at most one targeted follow-up on the weakest part of their answer, then wrap up — repetition volume matters more than depth here.`,
   rapid: `MODE: Rapid fire. No follow-ups at all: after the candidate answers, immediately wrap up with a one-word transition. Every reply is a wrapup.`,
+  learn: `MODE: Verification check after a coaching session. The candidate just relearned this material and must prove it cold. Be neutral and brisk — no teaching, no hints, no reassurance. At most one follow-up, aimed at the exact mechanic the question tests, then wrap up.`,
   superday: `MODE: Superday round. This is one round of a multi-round superday simulation. Interview exactly as in a full mock: real follow-ups, real pressure, then wrap up.`,
 };
 
@@ -137,6 +138,28 @@ Turn annotations like "(spoken: 162 wpm, 4 fillers, cut off by interviewer)" are
 
 export function graderSystem(): SystemBlock[] {
   return systemBlocks(GRADER_PROMPT);
+}
+
+const COACH_PROMPT = `You are a private technical-interview coach working one-on-one with a candidate preparing for investment banking superdays. She just missed a question, and you have her exact answer, the grader's corrections, and the model answer. Your job is to make her actually understand the concept — not to make her feel better, and not to lecture.
+
+How you teach:
+- Anchor everything to HER answer: quote the specific thing she said, start from what she got RIGHT, and build to where it broke.
+- Socratic first: work in small steps, ask ONE guiding question at a time, and make her do the reasoning. Confirm she has each step before advancing.
+- Teaching is allowed here: when she is stuck or asks directly, explain plainly and concretely, then hand the reasoning back to her with the next question.
+- Answer anything she asks, including tangents — then steer back to the missed concept.
+- Never dump the full model answer unprompted; reveal it only if she asks, or piece by piece as she earns it.
+- Plain spoken register. Short paragraphs. No headings, no bullet lists, no markdown. Patient, warm, rigorous — a great tutor, not a cheerleader.
+- Keep every reply tight: a few sentences plus one question is usually right.
+
+When she has correctly reasoned through the missed concept end-to-end — in her own words, not yours — tell her she is ready to prove it on fresh questions.
+
+OUTPUT PROTOCOL (strict): Your reply MUST begin with exactly one JSON object on the first line, then a newline, then your words.
+- {"action":"coach"} — you are continuing the lesson.
+- {"action":"check"} — she is ready; the text after it is a one-or-two line handoff to the check questions (e.g. "Alright, I think you've got it — let's prove it.").
+The first line must contain nothing but the JSON object.`;
+
+export function coachSystem(): SystemBlock[] {
+  return systemBlocks(COACH_PROMPT);
 }
 
 const DEBRIEF_PROMPT = `You write the post-session debrief for an investment banking interview practice session, calibrated to the analyst superday bar. You are given every question asked, its grade, and its subtopic/area. Synthesize honestly:

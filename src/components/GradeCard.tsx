@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { RubricBars } from "./RubricBars";
 import { ScoreBadge } from "./ScoreBadge";
 
@@ -17,7 +18,16 @@ export type GradeView = {
   deliveryFeedback?: string[];
 };
 
-export function GradeCard({ grade, defaultOpen = false }: { grade: GradeView; defaultOpen?: boolean }) {
+export function GradeCard({
+  grade,
+  defaultOpen = false,
+  learnHref,
+}: {
+  grade: GradeView;
+  defaultOpen?: boolean;
+  /** When this graded miss has a fixit, links into the coach. */
+  learnHref?: string | null;
+}) {
   const [showModel, setShowModel] = useState(defaultOpen);
   return (
     <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
@@ -32,6 +42,15 @@ export function GradeCard({ grade, defaultOpen = false }: { grade: GradeView; de
           />
         </div>
       </div>
+
+      {learnHref && (
+        <Link
+          href={learnHref}
+          className="mt-4 block rounded border border-indigo-500/40 bg-indigo-500/10 px-4 py-2.5 text-center text-sm font-semibold text-indigo-300 hover:bg-indigo-500/20"
+        >
+          Learn this properly with the coach →
+        </Link>
+      )}
 
       {grade.strengths.length > 0 && (
         <FeedbackList title="Strengths" items={grade.strengths} tone="text-emerald-400" />

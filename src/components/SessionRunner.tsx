@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CountdownTimer, CountUpTimer } from "./Timer";
 import { GradeCard, type GradeView } from "./GradeCard";
 import { TranscriptView, type TurnView } from "./TranscriptView";
+import { readSseStream } from "@/lib/client/sse";
 import {
   useVoiceSession,
   type InterjectionEvent,
@@ -92,6 +93,7 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [grade, setGrade] = useState<GradeView | null>(null);
+  const [gradeFixitId, setGradeFixitId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checkHeard, setCheckHeard] = useState(false);
 
@@ -267,10 +269,11 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
           body: JSON.stringify({ questionId }),
         });
         if (!res.ok) throw new Error((await res.json()).error ?? "Grading failed");
-        const body = (await res.json()) as { grade: GradeView };
+        const body = (await res.json()) as { grade: GradeView; fixitId?: string | null };
         setAnsweredCount((n) => n + 1);
         if (showReview) {
           setGrade(body.grade);
+          setGradeFixitId(body.fixitId ?? null);
           setPhase("review");
         } else {
           await advance();
@@ -716,7 +719,7 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       {/* Drill review */}
       {phase === "review" && grade && (
         <div className="mt-5 space-y-4">
-          <GradeCard grade={grade} />
+          <GradeCard grade={grade} learnHref={gradeFixitId ? `/learn/${gradeFixitId}` : null} />
           <button
             onClick={() => void advance()}
             className="w-full rounded bg-indigo-600 px-4 py-2.5 text-sm font-semibold hover:bg-indigo-500"
@@ -809,35 +812,6 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       )}
     </div>
   );
-}
-
-async function readSseStream(
-  res: Response,
-  handlers: { onDelta?: (text: string) => void; onDone?: (done: { action: string }) => void },
-): Promise<void> {
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  for (;;) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    buffer += decoder.decode(chunk.value, { stream: true });
-    const events = buffer.split("\n\n");
-    buffer = events.pop() ?? "";
-    for (const event of events) {
-      const line = event.split("\n").find((l) => l.startsWith("data: "));
-      if (!line) continue;
-      const payload = JSON.parse(line.slice(6)) as {
-        type: string;
-        text?: string;
-        action?: string;
-        error?: string;
-      };
-      if (payload.type === "delta") handlers.onDelta?.(payload.text ?? "");
-      else if (payload.type === "done") handlers.onDone?.({ action: payload.action ?? "wrapup" });
-      else if (payload.type === "error") throw new Error(payload.error ?? "Stream failed");
-    }
-  }
 }
 
 function modeLabel(mode: string): string {
