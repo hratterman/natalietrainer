@@ -83,6 +83,9 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   const phaseRef = useRef<Phase>("starting");
   const sessionIdRef = useRef<string | null>(initial.resume?.sessionId ?? null);
   const proofRef = useRef<LearnQuestionView | null>(initial.resume?.activeProof ?? null);
+  // The refs are ALSO assigned directly at each state change (see setProofNow /
+  // setSessionIdNow): passive effects run after paint, and a fast click can
+  // land in that window and read a stale ref. The effects stay as a backstop.
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
@@ -92,6 +95,15 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   useEffect(() => {
     proofRef.current = proof;
   }, [proof]);
+
+  function setProofNow(q: LearnQuestionView | null) {
+    proofRef.current = q;
+    setProof(q);
+  }
+  function setSessionIdNow(id: string) {
+    sessionIdRef.current = id;
+    setSessionId(id);
+  }
 
   const voice = useVoiceSession({
     enabled: voiceOn,
@@ -161,14 +173,14 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
             question?: LearnQuestionView;
             alreadyCompleted?: boolean;
           };
-          setSessionId(body.sessionId);
+          setSessionIdNow(body.sessionId);
           if (body.alreadyCompleted || !body.question) {
             // A refresh raced the grade — the server finished it for us.
             await refreshFixit();
             setPhase("closed");
             return;
           }
-          setProof(body.question);
+          setProofNow(body.question);
           setPhase("proving");
           return;
         }
@@ -176,7 +188,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         const res = await fetch(`/api/fixits/${initial.fixit.id}/lesson`, { method: "POST" });
         if (!res.ok) throw new Error((await res.json()).error ?? "Could not start the lesson");
         const body = (await res.json()) as { sessionId: string };
-        setSessionId(body.sessionId);
+        setSessionIdNow(body.sessionId);
         if (initial.resume?.activeProof) {
           setPhase("proving");
           return;
@@ -260,6 +272,8 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   async function startCheck(overrideSid?: string) {
     const sid = overrideSid ?? sessionIdRef.current;
     if (!sid) return;
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -271,7 +285,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
         setPhase("closed");
         return;
       }
-      setProof(body.question);
+      setProofNow(body.question);
       setProofTurns([]);
       setProofAnswer("");
       setProofGrade(null);
@@ -281,15 +295,14 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start the check");
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   }
 
   async function submitProofAnswer() {
     if (proofAnswer.trim().length === 0 || busy) return;
-    const submitted = proofAnswer.trim();
-    setProofAnswer("");
-    await submitProofCore(submitted, null);
+    await submitProofCore(proofAnswer.trim(), null);
   }
 
   async function submitProofCore(submitted: string, voicePayload: SpokenTurnPayload["voice"] | null) {
@@ -299,6 +312,9 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
     // Synchronous gate against double submits / spoken-turn races.
     if (busyRef.current) return;
     busyRef.current = true;
+    // Only clear the box once we're definitely submitting — a swallowed
+    // attempt must leave her text in place.
+    setProofAnswer("");
     setProofTurns((t) => [...t, { role: "you", content: submitted }]);
     setBusy(true);
     setProofStreaming("");
@@ -356,11 +372,13 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
     });
     if (!res.ok) throw new Error((await res.json()).error ?? "Grading failed");
     const body = (await res.json()) as { grade: GradeView };
-    setProofGrade(body.grade);
     const passed = body.grade.overall >= 70;
+    const updated = await refreshFixit();
+    // Only now surface the grade card: it invites the next click, so it must
+    // not appear while the submit lock is still held by our caller.
+    setProofGrade(body.grade);
     setLastProofFailed(!passed);
     if (passed) setPasses((p) => p + 1);
-    const updated = await refreshFixit();
     // Spot-checks always close after one grade; lessons close once resolved.
     if (initial.kind === "spotcheck" || updated?.status === "resolved") setPhase("closed");
   }
@@ -374,7 +392,7 @@ export function LearnRunner({ initial }: { initial: LearnInitialState }) {
   }
 
   function backToLesson() {
-    setProof(null);
+    setProofNow(null);
     setProofGrade(null);
     setChat((c) => [
       ...c,

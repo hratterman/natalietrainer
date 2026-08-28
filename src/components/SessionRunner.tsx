@@ -202,12 +202,16 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
   }
 
   function resetForQuestion(q: QuestionView) {
+    // Assign the ref immediately: the sync effect runs after paint, and a fast
+    // submit can land in that window and read the previous question.
+    questionRef.current = q;
     setQuestion(q);
     setTurns([]);
     setAnswer("");
     setScratchpad("");
     setStreamingText("");
     setGrade(null);
+    setError(null);
     answerStartRef.current = Date.now();
   }
 
@@ -312,6 +316,7 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
       const active = state.questions.find((q) => q.id === state.activeQuestionId);
       if (active) {
         const sameQuestion = questionRef.current?.id === active.id;
+        questionRef.current = active;
         setQuestion(active);
         setTurns(active.turns);
         setStreamingText("");
@@ -736,6 +741,12 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
 
   return (
     <div className="mx-auto max-w-3xl">
+      {/* Non-fatal notice (e.g. voice dropped → typing) */}
+      {error && (
+        <div className="mb-4 rounded border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm text-amber-300">
+          {error}
+        </div>
+      )}
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="text-sm text-slate-400">

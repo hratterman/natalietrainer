@@ -28,6 +28,13 @@ export class FakeVoiceController implements VoiceController {
   }
 
   async start(opts: { sessionId: string; personaId: string | null }): Promise<void> {
+    // Test hook: `window.__voiceFakeFailNextStart = true` makes the next
+    // connect/reconnect attempt fail once (network-drop simulation).
+    const g = globalThis as { __voiceFakeFailNextStart?: boolean };
+    if (g.__voiceFakeFailNextStart) {
+      g.__voiceFakeFailNextStart = false;
+      throw new Error("fake voice start failure");
+    }
     this.personaId = opts.personaId;
     this.started = true;
   }
@@ -99,5 +106,11 @@ export class FakeVoiceController implements VoiceController {
   /** Simulate the candidate starting to talk while the interviewer is speaking. */
   simulateBargeInStart(): void {
     this.events.onSpeechStarted?.(Date.now());
+  }
+
+  /** Simulate a transport failure (network drop) — the voice hook degrades to typing. */
+  simulateError(message = "fake transport failure"): void {
+    this.started = false;
+    this.events.onError?.(new Error(message));
   }
 }

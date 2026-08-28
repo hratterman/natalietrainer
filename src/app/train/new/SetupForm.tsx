@@ -77,13 +77,19 @@ export function SetupForm({
     }
     return prefillSubtopic ? "drill" : "mock";
   });
-  const [subtopicIds, setSubtopicIds] = useState<string[]>(
-    prefillSubtopic ? [prefillSubtopic] : [],
+  // URL prefills are untrusted: an unknown subtopic or out-of-range difficulty
+  // must not preselect anything the form can't represent (or the server rejects).
+  const [subtopicIds, setSubtopicIds] = useState<string[]>(() =>
+    prefillSubtopic &&
+    taxonomy.areas.some((a) => a.subtopics.some((s) => s.id === prefillSubtopic))
+      ? [prefillSubtopic]
+      : [],
   );
   const [areaIds, setAreaIds] = useState<string[]>(["acct", "ev", "val", "dcf", "mna", "lbo"]);
-  const [difficulty, setDifficulty] = useState<number | "adaptive">(
-    prefillDifficulty ? Number(prefillDifficulty) : "adaptive",
-  );
+  const [difficulty, setDifficulty] = useState<number | "adaptive">(() => {
+    const n = Number(prefillDifficulty);
+    return prefillDifficulty && Number.isInteger(n) && n >= 1 && n <= 5 ? n : "adaptive";
+  });
   // Number inputs are kept as strings and clamped at submit — a cleared or
   // garbage field must never send NaN to the server.
   const [questionCount, setQuestionCount] = useState(String(mode === "rapid" ? 10 : 5));
