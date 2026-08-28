@@ -18,6 +18,7 @@ Single-user IB technical-interview trainer: Next.js App Router + TypeScript stri
 ## Rules
 
 - `npm run test && npm run typecheck && npm run lint` must pass before any commit. Tests run offline (`LLM_MOCK=1` is set by vitest config).
+- `npm run e2e` is the offline browser suite (Playwright; boots its own server with `LLM_MOCK=1 VOICE_FAKE=1` and a throwaway DB; scenarios fail on any unallowed console error). Run it after changing SessionRunner/LearnRunner, routes, or voice client code; `-- --prod` verifies the production build.
 - After changing prompts or SDK usage, run `npm run smoke:llm` with a real key — it verifies structured parsing, the fallbacks param, and that the prompt-cache architecture actually hits (`cache_read_input_tokens > 0`). After changing voice code, run `npm run smoke:voice` (real OPENAI_API_KEY) and the manual checklist in README.md.
 - Interviewer follow-up budgets exclude spoken question openings (turnIndex 0) and canned interjections — keep `engine.followUpsUsed` and the mock in `interviewer.ts` consistent.
 - `src/lib/llm/*` and `src/lib/db/*` are server-only (`import "server-only"`); never import them from client components. Taxonomy and personas are client-safe data.

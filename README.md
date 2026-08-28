@@ -33,6 +33,7 @@ Questions, interviewing, and grading run on the Claude API (`claude-opus-5`), so
 | --- | --- |
 | `npm run dev` | Start the app |
 | `npm run test` | Unit + route tests (offline, mock LLM) |
+| `npm run e2e` | Browser E2E suite (offline; `-- --prod` runs it against a production build, `-- --repeat=3` soaks) |
 | `npm run typecheck` | TypeScript strict check |
 | `npm run lint` | ESLint |
 | `npm run smoke:llm` | One real Claude API round trip — run after SDK/prompt changes |
