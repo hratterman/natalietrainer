@@ -45,6 +45,19 @@ const DEFAULT_SUPERDAY_ROUNDS = [
   { personaId: "grinder", focusAreaId: "lbo", questionCount: 3 },
 ];
 
+/** Sample 4 distinct interviewers from the full roster for a fresh panel. */
+function shuffledPanel(personaIds: string[]): typeof DEFAULT_SUPERDAY_ROUNDS {
+  const pool = [...personaIds];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+  }
+  return DEFAULT_SUPERDAY_ROUNDS.map((round, i) => ({
+    ...round,
+    personaId: pool[i % pool.length] ?? round.personaId,
+  }));
+}
+
 export function SetupForm({
   taxonomy,
   voiceAvailable,
@@ -75,6 +88,7 @@ export function SetupForm({
   const [personaId, setPersonaId] = useState("quant");
   const [secondsPerQuestion, setSecondsPerQuestion] = useState(45);
   const [voiceMode, setVoiceMode] = useState(voiceAvailable);
+  const [superdayRounds, setSuperdayRounds] = useState(DEFAULT_SUPERDAY_ROUNDS);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -93,7 +107,7 @@ export function SetupForm({
       questionCount: mode === "superday" ? 12 : questionCount,
       personaId: mode === "mock" || mode === "superday" || mode === "drill" ? personaId : null,
       secondsPerQuestion: mode === "rapid" ? secondsPerQuestion : null,
-      rounds: mode === "superday" ? DEFAULT_SUPERDAY_ROUNDS : null,
+      rounds: mode === "superday" ? superdayRounds : null,
       // Rapid-fire stays typed: silence detection fights the hard countdown.
       voiceMode: mode !== "rapid" && voiceAvailable && voiceMode,
     };
@@ -236,9 +250,17 @@ export function SetupForm({
 
         {mode === "superday" && (
           <section>
-            <h3 className="text-sm font-semibold text-slate-200">Round plan</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-200">Round plan</h3>
+              <button
+                onClick={() => setSuperdayRounds(shuffledPanel(taxonomy.personas.map((p) => p.id)))}
+                className="rounded bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700"
+              >
+                Shuffle panel
+              </button>
+            </div>
             <ol className="mt-3 space-y-2 text-sm text-slate-300">
-              {DEFAULT_SUPERDAY_ROUNDS.map((round, i) => (
+              {superdayRounds.map((round, i) => (
                 <li key={i} className="flex items-center gap-3">
                   <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-800 text-xs">
                     {i + 1}

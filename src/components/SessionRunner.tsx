@@ -673,22 +673,27 @@ export function SessionRunner({ initial }: { initial: RunnerInitialState }) {
         </div>
       )}
 
-      {/* Voice: listening */}
+      {/* Voice: listening (or the interviewer holding the floor mid-interjection) */}
       {phase === "listening" && (
-        <div className="mt-5 rounded-lg border border-indigo-500/40 bg-indigo-500/5 p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-sm text-indigo-300">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-400" />
-              </span>
-              {personaName ?? "The interviewer"} is listening — speak your answer
-            </div>
-            <button
-              onClick={() => voiceRef.current.endListening()}
-              className="hidden"
-              aria-hidden
-            />
+        <div
+          data-listening={voice.listening ? "true" : "false"}
+          className="mt-5 rounded-lg border border-indigo-500/40 bg-indigo-500/5 p-4"
+        >
+          <div className="flex items-center gap-2 text-sm text-indigo-300">
+            {voice.listening ? (
+              <>
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-indigo-400 opacity-60" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-indigo-400" />
+                </span>
+                {personaName ?? "The interviewer"} is listening — speak your answer
+              </>
+            ) : (
+              <>
+                <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
+                {personaName ?? "The interviewer"} has the floor…
+              </>
+            )}
           </div>
           <div className="mt-3 min-h-12 text-sm italic leading-relaxed text-slate-300">
             {voice.captions || "…"}

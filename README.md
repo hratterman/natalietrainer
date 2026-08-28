@@ -35,7 +35,22 @@ Questions, interviewing, and grading run on the Claude API (`claude-opus-5`), so
 | `npm run test` | Unit + route tests (offline, mock LLM) |
 | `npm run typecheck` | TypeScript strict check |
 | `npm run lint` | ESLint |
-| `npm run smoke:llm` | One real API round trip — run after SDK/prompt changes |
+| `npm run smoke:llm` | One real Claude API round trip — run after SDK/prompt changes |
+| `npm run smoke:voice` | Real OpenAI voice-edge round trip — run after voice changes |
+
+## Voice mode — interviews like IRL
+
+With an `OPENAI_API_KEY` in `.env.local`, drills, mocks, and superdays can run **fully spoken**: the interviewer talks in a distinct voice per persona, you answer out loud, and a few seconds of silence submits your answer — no editing, exactly like the real thing. Claude remains the interviewer/grader brain; OpenAI powers only the audio edge (streaming transcription in, streaming TTS out; the key never reaches the browser).
+
+- **Seven interviewers** with real dispositions: the Friendly VP, the Quant, the Skeptic, the Grinder, a stone-faced MD, a rambly associate, and a trader. Different voices, different greetings, different amounts of patience.
+- **Live interruptions, both ways.** Talk over the interviewer and the voice stops. Ramble without a number in front of the trader and you'll hear "Stop. Number first, story later." mid-sentence — then a pointed follow-up on whatever you managed to say.
+- **Delivery grading.** Spoken answers get a fourth rubric dimension: answer-first framing, fillers, hedging, pace (measured WPM), and composure after being cut off.
+
+Wear headphones (echo cancellation keeps the mic hot for barge-in). Rapid-fire stays typed — silence detection would fight the countdown. Voice costs roughly $0.70 per 30-minute session on the OpenAI side.
+
+`npm run smoke:voice` verifies the OpenAI edge with a real key (token mint, TTS round trip, and a transcription loop that feeds the TTS audio back through speech-to-text). To develop the voice UI offline, set `VOICE_FAKE=1` with `LLM_MOCK=1`.
+
+**Manual voice checklist** (after changing voice code, with real keys): mic permission + voice check captions echo what you say · silence auto-submits at the persona's window · talking over the interviewer stops the audio · rambling number-less at the trader gets you cut off, with the duck-in feeling natural · persona voices clearly distinct · killing the network mid-session degrades to typing without losing the session.
 
 ## How it stays hard and fresh
 
