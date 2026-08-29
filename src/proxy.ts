@@ -28,5 +28,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|api/auth|_next/static|_next/image|favicon\\.ico|icon\\.svg).*)"],
+  // opengraph-image stays public: link-preview crawlers fetch it unauthenticated.
+  matcher: [
+    "/((?!login|api/auth|_next/static|_next/image|favicon\\.ico|icon\\.svg|opengraph-image).*)",
+  ],
 };

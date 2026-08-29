@@ -16,11 +16,13 @@ describe("PIN gate proxy", () => {
   it("has a matcher that skips login, auth routes, and static assets", () => {
     // The matcher is path-to-regexp with one embedded lookahead — mirror it.
     expect(config.matcher).toHaveLength(1);
-    const re = /^\/(?!login|api\/auth|_next\/static|_next\/image|favicon\.ico|icon\.svg).*$/;
+    const re =
+      /^\/(?!login|api\/auth|_next\/static|_next\/image|favicon\.ico|icon\.svg|opengraph-image).*$/;
     expect(re.test("/login")).toBe(false);
     expect(re.test("/api/auth/login")).toBe(false);
     expect(re.test("/_next/static/x.css")).toBe(false);
     expect(re.test("/icon.svg")).toBe(false);
+    expect(re.test("/opengraph-image.png")).toBe(false);
     expect(re.test("/")).toBe(true);
     expect(re.test("/history")).toBe(true);
     expect(re.test("/api/progress")).toBe(true);

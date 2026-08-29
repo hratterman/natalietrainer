@@ -10,6 +10,16 @@ export const metadata: Metadata = {
     template: "%s · Natalie Trainer",
   },
   description: "IB technical interview trainer",
+  openGraph: {
+    title: "NatalieTrainer",
+    description:
+      "Superday-grade IB interview training — a real interviewer across the table, honest scoring, and a mastery map that never lets you hide.",
+    siteName: "NatalieTrainer",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

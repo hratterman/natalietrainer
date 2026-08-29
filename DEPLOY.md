@@ -116,6 +116,7 @@ Point the subdomain's DNS at the mini's public IP and forward ports 80/443 on th
 - `flush_interval -1` matters: the interviewer streams replies over SSE, and proxy buffering would freeze the conversation. Same rule if you use nginx (`proxy_buffering off;` for `/api/`) — and don't put a buffering CDN in front of `/api/`.
 - Voice also opens a direct browser→OpenAI WebRTC connection; nothing to configure for that beyond HTTPS on the page itself.
 - Tell users (well, Natalie) to wear headphones in voice mode — echo cancellation keeps the mic hot for interruptions.
+- Link previews (iMessage/Slack/etc.) work out of the box — the app serves an Open Graph card publicly at `/opengraph-image.png`. If you put Caddy `basic_auth` in front of everything, preview crawlers get blocked and shared links show no image; that's a fine trade, just know it's the cause.
 
 ## 6. Verify the install
 
