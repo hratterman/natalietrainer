@@ -49,7 +49,7 @@ export class OpenAiVoiceController implements VoiceController {
     if (!tokenRes.ok) {
       throw new Error(
         ((await tokenRes.json().catch(() => null)) as { error?: string } | null)?.error ??
-          "Could not get a voice session token.",
+          `Could not get a voice session token (HTTP ${tokenRes.status}).`,
       );
     }
     const { value: secret } = (await tokenRes.json()) as { value: string };

@@ -23,6 +23,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
+    console.error("[voice] TTS failed:", err instanceof Error ? err.message : err);
     if (err instanceof VoiceUpstreamError) {
       return NextResponse.json({ error: err.message }, { status: 502 });
     }

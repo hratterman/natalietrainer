@@ -21,6 +21,9 @@ export async function POST(request: Request) {
     const secret = await mintTranscriptionSecret(persona);
     return NextResponse.json(secret);
   } catch (err) {
+    // Surface voice failures in the server log too — the browser's Network
+    // tab shouldn't be the only place the real upstream error lands.
+    console.error("[voice] token mint failed:", err instanceof Error ? err.message : err);
     if (err instanceof VoiceUpstreamError) {
       return NextResponse.json({ error: err.message }, { status: 502 });
     }

@@ -11,8 +11,14 @@ const OPENAI_BASE = "https://api.openai.com/v1";
 
 /** Pinned TTS model snapshot — update deliberately. */
 export const TTS_MODEL = "gpt-4o-mini-tts-2025-12-15";
-/** Realtime streaming transcription model. */
-export const TRANSCRIBE_MODEL = "gpt-live-transcribe";
+/**
+ * Realtime streaming transcription model. Must support server_vad turn
+ * detection — the strict-IRL flow (silence auto-submit, barge-in) rides on
+ * VAD turn commits. NOT gpt-live-transcribe or gpt-realtime-whisper: both
+ * reject turn_detection ("Turn detection is not supported for this
+ * transcription model", 400 invalid_value at the client_secrets mint).
+ */
+export const TRANSCRIBE_MODEL = "gpt-4o-transcribe";
 
 /** Biases transcription toward finance vocabulary and verbatim disfluencies. */
 export const TRANSCRIPTION_PROMPT =
