@@ -64,6 +64,7 @@ async function main() {
     ...process.env,
     LLM_MOCK: "1",
     VOICE_FAKE: "1",
+    BOOKLET_FIXTURE: "1",
     APP_PIN: "1234",
     DATABASE_PATH: path.join(dbDir, "e2e.db"),
     NEXT_TELEMETRY_DISABLED: "1",

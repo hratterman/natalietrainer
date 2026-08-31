@@ -48,6 +48,14 @@ npm start          # serves on http://localhost:3000 (override with PORT=xxxx np
 
 The database self-creates and self-migrates at `data/natalie.db` on first use — no setup step. **Always start the app from the repo root** so the `data/` directory lands in the same place every time.
 
+**One extra one-time step — the Booklet.** The app's Booklet tab drills a 400-question interview guide, and that guide is copyrighted, so its content isn't in the repo. Get the guide's `.docx` from Henry and run:
+
+```bash
+npm run booklet:ingest -- /path/to/400QuestionIBBible.docx
+```
+
+That writes `data/booklet.json` (it should report 398 questions parsed) and the tab lights up on the next page load — no restart needed. Until then the tab shows these same instructions.
+
 ## 4. Keep it alive across reboots (launchd)
 
 Save as `~/Library/LaunchAgents/com.natalietrainer.app.plist`, fixing the two paths (`which npm` tells you the npm path — usually `/opt/homebrew/bin/npm` on Apple Silicon):
@@ -133,7 +141,7 @@ Then open the site in a real browser and: run one topic drill end-to-end (questi
 
 ## 7. Care and feeding
 
-**Backups.** Everything is the three files `data/natalie.db`, `data/natalie.db-wal`, `data/natalie.db-shm`. Copy them somewhere nightly, e.g. a second launchd job or cron running:
+**Backups.** Everything is in `data/`: the database trio `natalie.db`, `natalie.db-wal`, `natalie.db-shm`, plus `booklet.json` (the ingested guide — re-creatable from the .docx, but easier to just keep). Copy the directory somewhere nightly, e.g. a second launchd job or cron running:
 
 ```bash
 rsync -a /PATH/TO/natalietrainer/data/ /PATH/TO/backups/natalietrainer-$(date +%F)/

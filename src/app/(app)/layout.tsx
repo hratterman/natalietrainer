@@ -21,6 +21,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLink href="/train/new" match="/train">
             Train
           </NavLink>
+          <span data-tour="booklet">
+            <NavLink href="/booklet">Booklet</NavLink>
+          </span>
           <NavLink href="/history">History</NavLink>
           <div className="ml-auto">
             <LockButton />

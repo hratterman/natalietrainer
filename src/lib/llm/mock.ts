@@ -1,6 +1,12 @@
 import "server-only";
 import type { Archetype } from "@/content/types";
-import type { Debrief, GeneratedQuestion, GeneratedRapidBatch, Grade } from "./schemas";
+import type {
+  BookletVerdictResult,
+  Debrief,
+  GeneratedQuestion,
+  GeneratedRapidBatch,
+  Grade,
+} from "./schemas";
 
 /**
  * Deterministic fixtures used when LLM_MOCK=1 — free offline dev and tests.
@@ -125,4 +131,27 @@ export function mockDebrief(input: {
       rationale: "[MOCK] Rebuild mechanics at difficulty 3 before re-testing at 4.",
     })),
   };
+}
+
+/**
+ * Booklet recall verdict double. Same convention as the interview mocks:
+ * length decides the outcome so tests steer it (<120 wrong, <240 partial,
+ * otherwise right — e2e's LONG_ANSWER is ≥240 chars and passes).
+ */
+export function mockBookletVerdict(answerLength: number): BookletVerdictResult {
+  if (answerLength < 120) {
+    return {
+      verdict: "wrong",
+      missing: ["[MOCK] the core mechanic", "[MOCK] the direction of the cash impact"],
+      note: "[MOCK] Rebuild from the canonical answer — the core is missing.",
+    };
+  }
+  if (answerLength < 240) {
+    return {
+      verdict: "partial",
+      missing: ["[MOCK] one load-bearing point"],
+      note: "[MOCK] Close — one key point short of the full answer.",
+    };
+  }
+  return { verdict: "right", missing: [], note: "[MOCK] Clean recall; keep the same order live." };
 }

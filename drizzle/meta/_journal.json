@@ -22,6 +22,13 @@
       "when": 1787929062183,
       "tag": "0002_fixits",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788146424153,
+      "tag": "0003_booklet",
+      "breakpoints": true
     }
   ]
 }

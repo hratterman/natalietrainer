@@ -1,7 +1,10 @@
 import "server-only";
-import { and, asc, desc, eq, inArray, isNotNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
 import { getDb } from "./index";
 import {
+  bookletReps,
+  bookletSettings,
+  bookletState,
   fixits,
   grades,
   mastery,
@@ -16,6 +19,7 @@ import {
   type SessionConfig,
   type SessionStatus,
 } from "./schema";
+import type { BookletVerdict } from "@/lib/booklet/types";
 import { applyGrade, initialMasteryState, type MasteryState } from "@/lib/mastery";
 
 export type SessionRow = typeof sessions.$inferSelect;
@@ -531,4 +535,132 @@ export function getActiveQuestion(sessionId: string): QuestionRow | undefined {
     .where(and(eq(questions.sessionId, sessionId), eq(questions.status, "active")))
     .orderBy(asc(questions.askedIndex))
     .get();
+}
+
+// ---- booklet ---------------------------------------------------------------
+
+export type BookletStateRow = typeof bookletState.$inferSelect;
+export type BookletSettingsRow = typeof bookletSettings.$inferSelect;
+
+const BOOKLET_SETTINGS_ID = "singleton";
+
+/** Settings always resolve; defaults apply until first save. */
+export function getBookletSettings(): { superdayDate: string | null; dailyMinutes: number } {
+  const row = getDb()
+    .select()
+    .from(bookletSettings)
+    .where(eq(bookletSettings.id, BOOKLET_SETTINGS_ID))
+    .get();
+  return row
+    ? { superdayDate: row.superdayDate, dailyMinutes: row.dailyMinutes }
+    : { superdayDate: null, dailyMinutes: 90 };
+}
+
+export function saveBookletSettings(input: {
+  superdayDate: string | null;
+  dailyMinutes: number;
+}): void {
+  getDb()
+    .insert(bookletSettings)
+    .values({
+      id: BOOKLET_SETTINGS_ID,
+      superdayDate: input.superdayDate,
+      dailyMinutes: input.dailyMinutes,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: bookletSettings.id,
+      set: {
+        superdayDate: input.superdayDate,
+        dailyMinutes: input.dailyMinutes,
+        updatedAt: new Date(),
+      },
+    })
+    .run();
+}
+
+export function listBookletStates(): BookletStateRow[] {
+  return getDb().select().from(bookletState).all();
+}
+
+export function getBookletState(itemId: string): BookletStateRow | undefined {
+  return getDb().select().from(bookletState).where(eq(bookletState.itemId, itemId)).get();
+}
+
+/** Write the scheduler's next state for an item (insert or replace). */
+export function saveBookletState(input: {
+  itemId: string;
+  phase: BookletStateRow["phase"];
+  step: number;
+  lapses: number;
+  dueAt: number;
+  lastSuccessAt: number | null;
+  introducedAt: number;
+}): void {
+  const now = new Date();
+  getDb()
+    .insert(bookletState)
+    .values({
+      itemId: input.itemId,
+      phase: input.phase,
+      step: input.step,
+      lapses: input.lapses,
+      dueAt: new Date(input.dueAt),
+      lastSuccessAt: input.lastSuccessAt != null ? new Date(input.lastSuccessAt) : null,
+      introducedAt: new Date(input.introducedAt),
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: bookletState.itemId,
+      set: {
+        phase: input.phase,
+        step: input.step,
+        lapses: input.lapses,
+        dueAt: new Date(input.dueAt),
+        lastSuccessAt: input.lastSuccessAt != null ? new Date(input.lastSuccessAt) : null,
+        updatedAt: now,
+      },
+    })
+    .run();
+}
+
+export function logBookletRep(input: {
+  itemId: string;
+  verdict: BookletVerdict;
+  gaveUp: boolean;
+  msSpent: number | null;
+}): void {
+  getDb()
+    .insert(bookletReps)
+    .values({
+      id: id(),
+      itemId: input.itemId,
+      verdict: input.verdict,
+      gaveUp: input.gaveUp,
+      msSpent: input.msSpent,
+      createdAt: new Date(),
+    })
+    .run();
+}
+
+/** Recent attempt durations (ms, newest first) for pacing recalibration. */
+export function recentBookletRepDurations(limit = 60): number[] {
+  return getDb()
+    .select({ msSpent: bookletReps.msSpent })
+    .from(bookletReps)
+    .where(isNotNull(bookletReps.msSpent))
+    .orderBy(desc(bookletReps.createdAt))
+    .limit(limit)
+    .all()
+    .map((r) => r.msSpent!)
+    .filter((ms) => ms > 0);
+}
+
+/** Reps logged since a timestamp (for the "done today" display). */
+export function countBookletRepsSince(sinceMs: number): number {
+  return getDb()
+    .select({ id: bookletReps.id })
+    .from(bookletReps)
+    .where(gte(bookletReps.createdAt, new Date(sinceMs)))
+    .all().length;
 }

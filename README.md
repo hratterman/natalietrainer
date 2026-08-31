@@ -13,6 +13,7 @@ An investment banking technical-interview trainer built for superday prep. It ge
 - **Honest scoring**: accuracy / completeness / structure rubrics with model answers and specific corrections; 80+ means offer-quality.
 - **Progress tracking**: a mastery heatmap over every subtopic, adaptive difficulty, weakness surfacing, and prescribed drill plans after every session.
 - **PIN login + onboarding**: a built-in PIN gate (`APP_PIN`, default 1234) covers every page and API route, and a first-visit welcome card + spotlight tour walks the dashboard.
+- **The Booklet**: her "400 questions" guide turned into a deadline-aware memorization system — daily recall queue, spaced re-proofs, and grading against the guide's own answers (see below).
 
 ## Setup
 
@@ -37,6 +38,7 @@ Questions, interviewing, and grading run on the Claude API (`claude-opus-5`), so
 | `npm run e2e` | Browser E2E suite (offline; `-- --prod` runs it against a production build, `-- --repeat=3` soaks) |
 | `npm run typecheck` | TypeScript strict check |
 | `npm run lint` | ESLint |
+| `npm run booklet:ingest -- <guide.docx>` | Load the 400-question guide into `data/booklet.json` (local only — see Booklet section) |
 | `npm run smoke:llm` | One real Claude API round trip — run after SDK/prompt changes |
 | `npm run smoke:voice` | Real OpenAI voice-edge round trip — run after voice changes |
 
@@ -62,6 +64,25 @@ Getting a question wrong isn't a dead end. Every meaningful miss (below 70 overa
 - **Prove it to close**: no credit for nodding along. When you (or the coach) think you've got it, you must beat **two fresh questions of the same archetype in a row**, graded cold by the normal grader (they feed your mastery too). Fail one and you're back in the lesson — the coach knows exactly what you missed.
 - **Spaced spot-checks**: resolved concepts resurface for a one-question spot-check 2 days later, then 7 days later. Pass both and it's cleared for good; miss one and it reopens with your newest miss as the starting point.
 - **Talk it through**: with voice available, the "🎙 Talk it through" toggle turns the lesson into a spoken conversation — the coach speaks (warm tutor voice, relaxed pacing, never interrupts) and you reason out loud; spoken proof answers get delivery grading too.
+
+## The Booklet — 400 questions, drilled cold
+
+The **Booklet** tab is a second training system for the "400 Investment Banking Interview Questions" guide: not generated questions, but the guide's own canon, memorized to the standard of *cold*. It's built on the study methods with the strongest evidence behind them:
+
+- **Retrieval only.** Every touch of a question is a recall attempt from memory — typed, then graded. Re-reading is never on the schedule; the full canon lives on the reference page for lookups.
+- **Learn to criterion, then re-prove it.** A question leaves the queue only after a fully right recall (misses come back the same session until it lands), and goes **cold** only after three more right recalls on separate, spreading days (3 → 7 → 16 days). Miss one and it drops back and starts over.
+- **A deadline that actually schedules.** Set the superday date and the intervals compress to fit, the daily intake of new questions is paced to cover everything in time, and the last two days re-run the entire deck as a final sweep. The overview always shows the honest math: on pace or not, and what daily budget would fix it.
+- **Interleaved, graded against the canon.** Sessions mix sections instead of blocking one topic. Claude grades each recall against the guide's canonical answer — substance over wording, modern figures accepted where the 2009 guide is dated — with a right / partial / wrong verdict, what you missed, and the canonical answer every time.
+
+Only the 277 technical + restructuring questions are drilled. The 121 fit and transaction-experience questions are reference-only, flagged "personalize, don't memorize" — sample answers to those need *your* stories (that's what the coach is for).
+
+**Loading the guide** (one-time, per machine): the guide is copyrighted, so it is never committed to this repo — the app reads a local `data/booklet.json` produced from your own copy:
+
+```bash
+npm run booklet:ingest -- /path/to/400QuestionIBBible.docx
+```
+
+Until that file exists, the Booklet tab shows setup instructions instead of a queue. Back up `data/booklet.json` alongside the database if you don't want to re-run the ingest.
 
 ## How it stays hard and fresh
 

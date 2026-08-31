@@ -38,6 +38,9 @@ yarn-error.log*
 /data/*.db
 /data/*.db-*
 
+# booklet canon — ingested from a copyrighted guide; never commit (public repo)
+/data/booklet.json
+
 # vercel
 .vercel
 

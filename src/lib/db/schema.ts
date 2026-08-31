@@ -1,4 +1,5 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import type { BookletPhase, BookletVerdict } from "@/lib/booklet/types";
 
 export const MODES = ["drill", "mock", "rapid", "superday", "learn"] as const;
 export type Mode = (typeof MODES)[number];
@@ -182,6 +183,47 @@ export const fixits = sqliteTable("fixits", {
   resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
   /** When a resolved fixit is due for a spot-check; null when open or cleared. */
   nextCheckAt: integer("next_check_at", { mode: "timestamp_ms" }),
+});
+
+/**
+ * Booklet memorization state, one row per canon item that has been
+ * introduced (no row = "new"). The canon itself lives outside the DB in a
+ * local JSON file (see src/lib/booklet/canon.ts); item_id references it.
+ *
+ * Lifecycle: learning (until first correct recall) → solidifying (3 spaced
+ * correct recalls, `step` counts them) → cold. A wrong recall in
+ * solidifying/cold laps back to learning.
+ */
+export const bookletState = sqliteTable("booklet_state", {
+  itemId: text("item_id").primaryKey(),
+  phase: text("phase").$type<BookletPhase>().notNull(),
+  /** Solidifying ladder index: successful spaced recalls since criterion. */
+  step: integer("step").notNull().default(0),
+  lapses: integer("lapses").notNull().default(0),
+  dueAt: integer("due_at", { mode: "timestamp_ms" }).notNull(),
+  lastSuccessAt: integer("last_success_at", { mode: "timestamp_ms" }),
+  introducedAt: integer("introduced_at", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+/** Append-only log of booklet recall attempts; feeds pacing recalibration. */
+export const bookletReps = sqliteTable("booklet_reps", {
+  id: text("id").primaryKey(),
+  itemId: text("item_id").notNull(),
+  verdict: text("verdict").$type<BookletVerdict>().notNull(),
+  /** Revealed the answer without attempting — logged as wrong. */
+  gaveUp: integer("gave_up", { mode: "boolean" }).notNull().default(false),
+  msSpent: integer("ms_spent"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+/** Single-row booklet study settings (id = "singleton"). */
+export const bookletSettings = sqliteTable("booklet_settings", {
+  id: text("id").primaryKey(),
+  /** Superday date as local YYYY-MM-DD; null = no deadline set. */
+  superdayDate: text("superday_date"),
+  dailyMinutes: integer("daily_minutes").notNull().default(90),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });
 
 /**

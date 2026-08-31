@@ -101,3 +101,24 @@ export const debriefSchema = z.object({
   ),
 });
 export type Debrief = z.infer<typeof debriefSchema>;
+
+/** Booklet recall verdict — deliberately small; the canon answer is the feedback. */
+export const bookletVerdictSchema = z.object({
+  verdict: z
+    .enum(["right", "partial", "wrong"])
+    .describe(
+      "right = would fully satisfy an interviewer; partial = right direction but missing a key point or materially imprecise; wrong = the core is missing or incorrect.",
+    ),
+  missing: z
+    .array(z.string())
+    .max(3)
+    .describe(
+      "The specific points missed or gotten wrong, each one short line. Empty when the verdict is right.",
+    ),
+  note: z
+    .string()
+    .describe(
+      "One tight coaching line: the single most useful correction or sharpening. For a right answer, the one thing that would make it even crisper.",
+    ),
+});
+export type BookletVerdictResult = z.infer<typeof bookletVerdictSchema>;

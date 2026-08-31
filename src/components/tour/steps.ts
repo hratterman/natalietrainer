@@ -38,6 +38,13 @@ export const TOUR_STEPS: TourStep[] = [
     placement: "bottom",
   },
   {
+    id: "booklet",
+    anchor: "booklet",
+    title: "The Booklet",
+    body: "Your 400-question guide as a daily recall queue — spaced, interleaved, and checked against the book's own answers. Set your superday date and it paces the reps so everything is cold in time.",
+    placement: "bottom",
+  },
+  {
     id: "nav",
     anchor: "nav",
     title: "Everything else",

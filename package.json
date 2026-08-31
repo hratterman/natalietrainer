@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "e2e": "node scripts/e2e.mjs",
+    "booklet:ingest": "node scripts/booklet-ingest.mjs",
     "smoke:llm": "NODE_OPTIONS='--conditions=react-server' tsx scripts/smoke-llm.ts",
     "smoke:voice": "NODE_OPTIONS='--conditions=react-server' tsx scripts/smoke-voice.ts"
   },
