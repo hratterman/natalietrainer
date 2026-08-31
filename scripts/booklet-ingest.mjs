@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 /**
- * Ingest the "400 Questions" interview guide (.docx) into the local booklet
- * canon the app reads at runtime.
+ * Ingest the "400 Questions" interview guide (.docx) into the booklet canon
+ * the app reads at runtime.
  *
  *   npm run booklet:ingest -- /path/to/400QuestionIBBible.docx
  *
- * Output: data/booklet.json (gitignored — the guide is copyrighted, and this
- * repo is public, so the canon text must never be committed).
+ * Output: src/content/booklet.json, which is committed and bundled — the app
+ * ships with the canon, so this only needs re-running when the source guide
+ * changes (a new edition, a corrected parse).
  *
  * No dependencies: `unzip` extracts word/document.xml and a small
  * paragraph-level parser walks the WordprocessingML. The parser targets the
@@ -20,10 +21,11 @@ import path from "node:path";
 
 const args = process.argv.slice(2);
 const outFlag = args.indexOf("--out");
-const outPath = outFlag !== -1 ? args.splice(outFlag, 2)[1] : path.join("data", "booklet.json");
+const outPath =
+  outFlag !== -1 ? args.splice(outFlag, 2)[1] : path.join("src", "content", "booklet.json");
 const docxPath = args[0];
 if (!docxPath) {
-  console.error("Usage: npm run booklet:ingest -- /path/to/guide.docx [--out data/booklet.json]");
+  console.error("Usage: npm run booklet:ingest -- /path/to/guide.docx [--out src/content/booklet.json]");
   process.exit(2);
 }
 

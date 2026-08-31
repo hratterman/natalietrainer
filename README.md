@@ -38,7 +38,7 @@ Questions, interviewing, and grading run on the Claude API (`claude-opus-5`), so
 | `npm run e2e` | Browser E2E suite (offline; `-- --prod` runs it against a production build, `-- --repeat=3` soaks) |
 | `npm run typecheck` | TypeScript strict check |
 | `npm run lint` | ESLint |
-| `npm run booklet:ingest -- <guide.docx>` | Load the 400-question guide into `data/booklet.json` (local only — see Booklet section) |
+| `npm run booklet:ingest -- <guide.docx>` | Regenerate the booklet canon from the guide (only needed if the guide changes) |
 | `npm run smoke:llm` | One real Claude API round trip — run after SDK/prompt changes |
 | `npm run smoke:voice` | Real OpenAI voice-edge round trip — run after voice changes |
 
@@ -76,13 +76,11 @@ The **Booklet** tab is a second training system for the "400 Investment Banking 
 
 Only the 277 technical + restructuring questions are drilled. The 121 fit and transaction-experience questions are reference-only, flagged "personalize, don't memorize" — sample answers to those need *your* stories (that's what the coach is for).
 
-**Loading the guide** (one-time, per machine): the guide is copyrighted, so it is never committed to this repo — the app reads a local `data/booklet.json` produced from your own copy:
+The canon ships with the app (`src/content/booklet.json`, 398 questions), so a fresh clone has it — no setup step. If the guide is ever revised, regenerate it from the .docx:
 
 ```bash
-npm run booklet:ingest -- /path/to/400QuestionIBBible.docx
+npm run booklet:ingest -- /path/to/400QuestionIBBible.docx   # rewrites src/content/booklet.json
 ```
-
-Until that file exists, the Booklet tab shows setup instructions instead of a queue. Back up `data/booklet.json` alongside the database if you don't want to re-run the ingest.
 
 ## How it stays hard and fresh
 

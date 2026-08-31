@@ -25,35 +25,6 @@ function CoverageBar({ s, thick = false }: { s: Omit<SectionCoverage, "sectionId
 
 export default function BookletPage() {
   const overview = getOverview();
-
-  if (!overview.available) {
-    return (
-      <div className="mx-auto max-w-2xl">
-        <h1 className="text-2xl font-bold tracking-tight text-ink-900">The Booklet</h1>
-        <div className="card card-pad mt-6">
-          <h2 className="text-base font-semibold text-ink-900">
-            The question guide isn&apos;t loaded on this machine yet
-          </h2>
-          <p className="mt-2 text-sm text-ink-600">
-            The booklet trainer runs off the &ldquo;400 Questions&rdquo; guide, which is
-            copyrighted — so it ships separately from the app and lives only on this computer.
-            Loading it takes one command:
-          </p>
-          <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-ink-600">
-            <li>Get the guide&apos;s .docx file from Henry.</li>
-            <li>
-              From the app folder, run{" "}
-              <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-ink-900">
-                npm run booklet:ingest -- /path/to/guide.docx
-              </code>
-            </li>
-            <li>Refresh this page.</li>
-          </ol>
-        </div>
-      </div>
-    );
-  }
-
   const { settings, sections, totals, plan, projection, repsToday, referenceCounts } = overview;
   const todayTotal = plan.carryoverCount + plan.reviewCount + plan.newCount;
 

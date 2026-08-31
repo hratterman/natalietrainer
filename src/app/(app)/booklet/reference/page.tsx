@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { referenceSections } from "@/lib/booklet/engine";
 
 export const dynamic = "force-dynamic";
@@ -18,17 +17,6 @@ const DECK_HEADINGS: Record<string, string> = {
 
 export default function BookletReferencePage() {
   const sections = referenceSections();
-
-  if (sections.length === 0) {
-    return (
-      <div className="mx-auto max-w-xl card card-pad text-center">
-        <p className="text-sm text-ink-600">The question guide isn&apos;t loaded yet.</p>
-        <Link href="/booklet" className="btn btn-secondary btn-sm mt-3">
-          Back to the Booklet
-        </Link>
-      </div>
-    );
-  }
 
   const decks: ("technical" | "fit" | "experience")[] = ["technical", "fit", "experience"];
 

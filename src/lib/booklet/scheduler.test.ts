@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   applyVerdict,
+  effectiveScale,
+  intakeDays,
   buildQueue,
   calibrateReviewSec,
   COLD_AT_STEP,
@@ -11,6 +13,7 @@ import {
   DEFAULT_REVIEW_SEC,
   FINAL_SWEEP_DAYS,
   ladderScale,
+  MIN_LADDER_SCALE,
   parseLocalDate,
   projectPace,
   remainingTailDays,
@@ -34,6 +37,10 @@ function state(partial: Partial<ItemState>): ItemState {
   };
 }
 
+/** No-deadline context: the ladder runs at full length. */
+const FREE = { superdayMs: null, scale: 1 };
+const ctx = (superdayMs: number | null, scale = 1) => ({ superdayMs, scale });
+
 function item(id: string, sectionId = "accounting-basic"): BookletItem {
   return {
     id,
@@ -47,7 +54,7 @@ function item(id: string, sectionId = "accounting-basic"): BookletItem {
 
 describe("applyVerdict", () => {
   it("first-ever right recall meets criterion: solidifying, first ladder interval", () => {
-    const t = applyVerdict(null, "right", NOW, null);
+    const t = applyVerdict(null, "right", NOW, FREE);
     expect(t.requeue).toBe(false);
     expect(t.next.phase).toBe("solidifying");
     expect(t.next.step).toBe(0);
@@ -56,7 +63,7 @@ describe("applyVerdict", () => {
   });
 
   it("first-ever miss starts learning and requeues in-session", () => {
-    const t = applyVerdict(null, "wrong", NOW, null);
+    const t = applyVerdict(null, "wrong", NOW, FREE);
     expect(t.requeue).toBe(true);
     expect(t.next.phase).toBe("learning");
     expect(t.next.lapses).toBe(0); // a first miss is not a lapse
@@ -64,23 +71,23 @@ describe("applyVerdict", () => {
   });
 
   it("learning + partial keeps requeueing until fully right", () => {
-    const t = applyVerdict(state({ phase: "learning" }), "partial", NOW, null);
+    const t = applyVerdict(state({ phase: "learning" }), "partial", NOW, FREE);
     expect(t.requeue).toBe(true);
     expect(t.next.phase).toBe("learning");
   });
 
   it("solidifying rights climb the ladder and turn cold at the top", () => {
-    const s1 = applyVerdict(state({ step: 0 }), "right", NOW, null);
+    const s1 = applyVerdict(state({ step: 0 }), "right", NOW, FREE);
     expect(s1.next.step).toBe(1);
     expect(s1.next.dueAt).toBe(TODAY + SOLIDIFY_LADDER_DAYS[1] * DAY_MS);
 
-    const s3 = applyVerdict(state({ step: COLD_AT_STEP - 1 }), "right", NOW, null);
+    const s3 = applyVerdict(state({ step: COLD_AT_STEP - 1 }), "right", NOW, FREE);
     expect(s3.next.phase).toBe("cold");
     expect(s3.next.dueAt).toBe(TODAY + COLD_INTERVAL_DAYS * DAY_MS);
   });
 
   it("solidifying partial retries tomorrow without advancing or lapsing", () => {
-    const t = applyVerdict(state({ step: 1 }), "partial", NOW, null);
+    const t = applyVerdict(state({ step: 1 }), "partial", NOW, FREE);
     expect(t.requeue).toBe(false);
     expect(t.next.step).toBe(1);
     expect(t.next.lapses).toBe(0);
@@ -89,14 +96,14 @@ describe("applyVerdict", () => {
 
   it("wrong in solidifying or cold is a lapse back to learning", () => {
     for (const phase of ["solidifying", "cold"] as const) {
-      const t = applyVerdict(state({ phase, step: 2, lapses: 1 }), "wrong", NOW, null);
+      const t = applyVerdict(state({ phase, step: 2, lapses: 1 }), "wrong", NOW, FREE);
       expect(t.requeue).toBe(true);
       expect(t.next).toMatchObject({ phase: "learning", step: 0, lapses: 2 });
     }
   });
 
   it("cold + right stays cold on the maintenance interval", () => {
-    const t = applyVerdict(state({ phase: "cold", step: COLD_AT_STEP }), "right", NOW, null);
+    const t = applyVerdict(state({ phase: "cold", step: COLD_AT_STEP }), "right", NOW, FREE);
     expect(t.next.phase).toBe("cold");
     expect(t.next.dueAt).toBe(TODAY + COLD_INTERVAL_DAYS * DAY_MS);
   });
@@ -111,14 +118,37 @@ describe("deadline compression", () => {
     // Past deadlines behave like none.
     expect(ladderScale(TODAY - DAY_MS, NOW)).toBe(1);
 
-    const t = applyVerdict(state({ phase: "cold", step: COLD_AT_STEP }), "right", NOW, superday);
+    const t = applyVerdict(state({ phase: "cold", step: COLD_AT_STEP }), "right", NOW, ctx(superday, 0.5));
     const sweepStart = superday - FINAL_SWEEP_DAYS * DAY_MS;
     expect(t.next.dueAt).toBeLessThanOrEqual(sweepStart);
   });
 
+  it("reserved intake days compress the ladder further, down to the floor", () => {
+    const far = TODAY + 40 * DAY_MS;
+    expect(ladderScale(far, NOW, 0)).toBe(1);
+    expect(ladderScale(far, NOW, 20)).toBeLessThan(1);
+    expect(ladderScale(far, NOW, 999)).toBe(MIN_LADDER_SCALE);
+
+    // effectiveScale derives those reserved days from the intake backlog.
+    expect(intakeDays(0, 120)).toBe(0);
+    expect(intakeDays(277, 120)).toBeGreaterThan(10);
+    const backlogged = effectiveScale({
+      superdayMs: far,
+      newRemaining: 277,
+      dailyMinutes: 120,
+      now: NOW,
+    });
+    expect(backlogged).toBeLessThan(effectiveScale({
+      superdayMs: far,
+      newRemaining: 0,
+      dailyMinutes: 120,
+      now: NOW,
+    }));
+  });
+
   it("inside the sweep window everything lands tomorrow at the latest", () => {
     const imminent = TODAY + 1 * DAY_MS;
-    const t = applyVerdict(state({ step: 0 }), "right", NOW, imminent);
+    const t = applyVerdict(state({ step: 0 }), "right", NOW, ctx(imminent, 0.5));
     expect(t.next.dueAt).toBe(TODAY + DAY_MS);
   });
 });
@@ -196,7 +226,41 @@ describe("projectPace", () => {
     expect(p.totalMinutesLeft).toBeGreaterThan(60);
   });
 
-  it("tight deadline: off pace with a concrete daily-minutes suggestion", () => {
+  it("recoverable deadline: suggests a budget that genuinely lands in time", () => {
+    const args = {
+      newRemaining: 277,
+      learningCount: 0,
+      solidifyingTailDays: [] as number[],
+      superdayMs: TODAY + 24 * DAY_MS,
+      now: NOW,
+    };
+    const thin = projectPace({ ...args, dailyMinutes: 60 });
+    expect(thin.onPace).toBe(false);
+    expect(thin.suggestedDailyMinutes).toBeGreaterThan(60);
+
+    // The advice has to actually work when taken — a suggestion that still
+    // misses the sweep is worse than none.
+    const taken = projectPace({ ...args, dailyMinutes: thin.suggestedDailyMinutes! });
+    expect(taken.onPace).toBe(true);
+  });
+
+  it("the whole deck at 2h/day with 3+ weeks is on pace (compression covers the tail)", () => {
+    // Regression: the ladder used to compress against the full runway while
+    // ignoring the ~15 intake days ahead of it, so this read "off pace" and
+    // demanded 6h/day even though only ~35h of work remained.
+    const p = projectPace({
+      newRemaining: 277,
+      learningCount: 0,
+      solidifyingTailDays: [],
+      superdayMs: TODAY + 24 * DAY_MS,
+      dailyMinutes: 120,
+      now: NOW,
+    });
+    expect(p.onPace).toBe(true);
+    expect(p.totalMinutesLeft).toBeLessThan(40 * 60);
+  });
+
+  it("an impossible deadline says so instead of inventing a number", () => {
     const p = projectPace({
       newRemaining: 277,
       learningCount: 0,
@@ -206,7 +270,7 @@ describe("projectPace", () => {
       now: NOW,
     });
     expect(p.onPace).toBe(false);
-    expect(p.suggestedDailyMinutes).toBeGreaterThan(30);
+    expect(p.suggestedDailyMinutes).toBeNull();
   });
 
   it("comfortable deadline: on pace", () => {

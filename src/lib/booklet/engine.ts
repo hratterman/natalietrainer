@@ -8,7 +8,7 @@ import {
   buildQueue,
   calibrateReviewSec,
   dayStart,
-  ladderScale,
+  effectiveScale,
   parseLocalDate,
   projectPace,
   remainingTailDays,
@@ -48,21 +48,17 @@ export type SectionCoverage = {
   cold: number;
 };
 
-export type BookletOverview =
-  | { available: false }
-  | {
-      available: true;
-      settings: { superdayDate: string | null; dailyMinutes: number };
-      sections: SectionCoverage[];
-      totals: { total: number; fresh: number; learning: number; solidifying: number; cold: number };
-      plan: Pick<QueuePlan, "carryoverCount" | "reviewCount" | "newCount" | "estMinutes">;
-      repsToday: number;
-      projection: ReturnType<typeof projectPace>;
-      referenceCounts: { fit: number; experience: number };
-    };
+export type BookletOverview = {
+  settings: { superdayDate: string | null; dailyMinutes: number };
+  sections: SectionCoverage[];
+  totals: { total: number; fresh: number; learning: number; solidifying: number; cold: number };
+  plan: Pick<QueuePlan, "carryoverCount" | "reviewCount" | "newCount" | "estMinutes">;
+  repsToday: number;
+  projection: ReturnType<typeof projectPace>;
+  referenceCounts: { fit: number; experience: number };
+};
 
 export function getOverview(now = Date.now()): BookletOverview {
-  if (!getCanon()) return { available: false };
   const items = deckItems("technical");
   const states = loadStates();
   const settings = repo.getBookletSettings();
@@ -108,7 +104,13 @@ export function getOverview(now = Date.now()): BookletOverview {
     estMinutes: queuePlan.estMinutes,
   };
 
-  const scale = ladderScale(superdayMs, now);
+  const scale = effectiveScale({
+    superdayMs,
+    newRemaining: totals.fresh + totals.learning,
+    dailyMinutes: settings.dailyMinutes,
+    now,
+    reviewSec,
+  });
   const tails: number[] = [];
   for (const state of states.values()) {
     if (state.phase === "solidifying") tails.push(remainingTailDays(state, scale));
@@ -124,7 +126,6 @@ export function getOverview(now = Date.now()): BookletOverview {
   });
 
   return {
-    available: true,
     settings,
     sections,
     totals,
@@ -146,7 +147,6 @@ export type QueueItemView = {
 };
 
 export function getTodayQueue(now = Date.now()): { entries: QueueItemView[]; estMinutes: number } {
-  if (!getCanon()) return { entries: [], estMinutes: 0 };
   const settings = repo.getBookletSettings();
   const plan = buildQueue({
     items: deckItems("technical"),
@@ -200,13 +200,22 @@ export async function submitRecall(input: {
     : await gradeRecall(item, input.answer);
 
   const settings = repo.getBookletSettings();
-  const row = repo.getBookletState(item.id);
-  const { next, requeue } = applyVerdict(
-    row ? toItemState(row) : null,
-    result.verdict,
-    now,
-    superdayMsFrom(settings),
-  );
+  const states = repo.listBookletStates();
+  const row = states.find((s) => s.itemId === item.id);
+  const superdayMs = superdayMsFrom(settings);
+  // Same compression the overview projects with, so a due date never
+  // contradicts the pacing line she was just shown.
+  const notYetIntroduced = Math.max(0, deckItems("technical").length - states.length);
+  const { next, requeue } = applyVerdict(row ? toItemState(row) : null, result.verdict, now, {
+    superdayMs,
+    scale: effectiveScale({
+      superdayMs,
+      newRemaining: notYetIntroduced,
+      dailyMinutes: settings.dailyMinutes,
+      now,
+      reviewSec: calibrateReviewSec(repo.recentBookletRepDurations()),
+    }),
+  });
   repo.saveBookletState({ itemId: item.id, ...next });
   repo.logBookletRep({
     itemId: item.id,
@@ -233,7 +242,6 @@ export function referenceSections(): {
   items: { id: string; question: string; answer: string }[];
 }[] {
   const canon = getCanon();
-  if (!canon) return [];
   const out: ReturnType<typeof referenceSections> = [];
   for (const item of canon.items) {
     let section = out[out.length - 1];

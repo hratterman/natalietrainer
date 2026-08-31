@@ -29,6 +29,8 @@ export const COLD_AT_STEP = SOLIDIFY_LADDER_DAYS.length;
 export const COLD_INTERVAL_DAYS = 21;
 /** Everything resurfaces in the last N days before the superday. */
 export const FINAL_SWEEP_DAYS = 2;
+/** Floor on ladder compression — below this, "spaced" stops meaning anything. */
+export const MIN_LADDER_SCALE = 0.25;
 
 /** Default seconds per rep, until real timings recalibrate them. */
 export const DEFAULT_REVIEW_SEC = 75;
@@ -37,6 +39,8 @@ export const NEW_ITEM_FACTOR = 2; // first-touch ≈ 2× a review
 /** No deadline set: steady default intake. */
 const DEFAULT_NEW_PER_DAY = 20;
 const MAX_QUEUE = 150;
+/** Ceiling on what the pacing advice will ask of her in one day. */
+const MAX_SUGGESTED_MINUTES = 240;
 
 export type ItemState = {
   phase: BookletPhase;
@@ -73,16 +77,55 @@ export function daysUntil(deadlineMs: number, now: number): number {
 const FULL_LADDER_DAYS = SOLIDIFY_LADDER_DAYS.reduce<number>((a, b) => a + b, 0);
 
 /**
- * Ladder scale for the current runway. 1 with no deadline or a comfortable
- * one; shrinks (floor 0.35) as the superday approaches so re-proofs still
- * fit. A past deadline behaves like no deadline.
+ * Days needed to introduce `newRemaining` items at a given daily budget,
+ * costing each item its first touch plus the reviews it will pull along.
  */
-export function ladderScale(superdayMs: number | null, now: number): number {
+export function intakeDays(
+  newRemaining: number,
+  dailyMinutes: number,
+  reviewSec = DEFAULT_REVIEW_SEC,
+): number {
+  if (newRemaining <= 0) return 0;
+  const perItemSec = reviewSec * NEW_ITEM_FACTOR + COLD_AT_STEP * reviewSec;
+  const perDay = Math.max(1, Math.floor((dailyMinutes * 60) / perItemSec));
+  return Math.ceil(newRemaining / perDay);
+}
+
+/**
+ * Ladder scale for the runway that is actually left for spacing. 1 with no
+ * deadline or a comfortable one; compresses as the superday approaches.
+ *
+ * `reservedDays` is time the ladder cannot use — above all the intake days
+ * still ahead, since the LAST question introduced still needs its full
+ * ladder before the sweep. Ignoring that is what makes a deadline look
+ * unreachable when the real problem is just uncompressed spacing.
+ */
+export function ladderScale(
+  superdayMs: number | null,
+  now: number,
+  reservedDays = 0,
+): number {
   if (superdayMs == null) return 1;
   const days = daysUntil(superdayMs, now);
   if (days <= 0) return 1;
-  const usable = days - FINAL_SWEEP_DAYS - 2;
-  return Math.min(1, Math.max(0.35, usable / (FULL_LADDER_DAYS + 4)));
+  const usable = days - FINAL_SWEEP_DAYS - reservedDays;
+  return Math.min(1, Math.max(MIN_LADDER_SCALE, usable / FULL_LADDER_DAYS));
+}
+
+/** The scale in force given everything still to introduce. */
+export function effectiveScale(input: {
+  superdayMs: number | null;
+  newRemaining: number;
+  dailyMinutes: number;
+  now: number;
+  reviewSec?: number;
+}): number {
+  const reviewSec = input.reviewSec ?? DEFAULT_REVIEW_SEC;
+  return ladderScale(
+    input.superdayMs,
+    input.now,
+    intakeDays(input.newRemaining, input.dailyMinutes, reviewSec),
+  );
 }
 
 function scaledInterval(step: number, scale: number): number {
@@ -100,6 +143,9 @@ function capDue(dueMs: number, superdayMs: number | null, now: number): number {
 
 // ---- verdict → next state --------------------------------------------------
 
+/** Deadline + the ladder compression in force for it. */
+export type ScheduleContext = { superdayMs: number | null; scale: number };
+
 export type Transition = {
   next: ItemState;
   /** Re-ask later in the same session until she gets it fully right. */
@@ -115,9 +161,9 @@ export function applyVerdict(
   state: ItemState | null,
   verdict: BookletVerdict,
   now: number,
-  superdayMs: number | null,
+  ctx: ScheduleContext,
 ): Transition {
-  const scale = ladderScale(superdayMs, now);
+  const { superdayMs, scale } = ctx;
   const introducedAt = state?.introducedAt ?? now;
   const lapses = state?.lapses ?? 0;
   const phase = state?.phase ?? "learning";
@@ -241,11 +287,18 @@ export function buildQueue(input: {
   if (superdayMs != null) {
     const days = daysUntil(superdayMs, now);
     if (days > 0) {
-      const scale = ladderScale(superdayMs, now);
-      const introDays = Math.max(
-        1,
-        days - FINAL_SWEEP_DAYS - Math.round(SOLIDIFY_LADDER_DAYS[0] * scale),
+      const scale = effectiveScale({
+        superdayMs,
+        newRemaining: fresh.length,
+        dailyMinutes,
+        now,
+        reviewSec,
+      });
+      const ladderTail = SOLIDIFY_LADDER_DAYS.reduce<number>(
+        (sum, d) => sum + Math.max(1, Math.round(d * scale)),
+        0,
       );
+      const introDays = Math.max(1, days - FINAL_SWEEP_DAYS - ladderTail);
       target = Math.max(DEFAULT_NEW_PER_DAY, Math.ceil(fresh.length / introDays));
     }
   }
@@ -304,46 +357,65 @@ export function projectPace(input: {
   const { newRemaining, learningCount, solidifyingTailDays, superdayMs, dailyMinutes, now } = input;
   const reviewSec = input.reviewSec ?? DEFAULT_REVIEW_SEC;
   const newSec = reviewSec * NEW_ITEM_FACTOR;
-  const scale = ladderScale(superdayMs, now);
-  const ladder = SOLIDIFY_LADDER_DAYS.map((d) => Math.max(1, Math.round(d * scale)));
-  const ladderSum = ladder.reduce((a, b) => a + b, 0);
+  const perItemSec = newSec + COLD_AT_STEP * reviewSec;
 
   const toIntroduce = newRemaining + learningCount;
   const remaining = toIntroduce + solidifyingTailDays.length;
+  const pipelineTail = solidifyingTailDays.reduce((max, t) => Math.max(max, t), 0);
 
-  // Time: intro rep + 3 re-proofs per not-yet-cold item, +20% for lapses.
-  const introReps = toIntroduce;
-  const reviewReps =
-    toIntroduce * COLD_AT_STEP +
-    solidifyingTailDays.reduce(
-      (n, tail) => n + Math.max(1, Math.ceil(tail / Math.max(1, ladder[ladder.length - 1] ?? 1))),
+  /**
+   * Days until the last item goes cold at a given budget. Both the ladder
+   * (via the reserved-intake scale) and the intake rate move with the
+   * budget, so the pace suggestion below has to search this same function
+   * rather than invert a formula.
+   */
+  function daysToCold(minutes: number): number {
+    const scale = effectiveScale({
+      superdayMs,
+      newRemaining: toIntroduce,
+      dailyMinutes: minutes,
+      now,
+      reviewSec,
+    });
+    const ladderSum = SOLIDIFY_LADDER_DAYS.reduce<number>(
+      (sum, d) => sum + Math.max(1, Math.round(d * scale)),
       0,
     );
-  const totalSec = (introReps * newSec + reviewReps * reviewSec) * 1.2;
+    const perDay = Math.max(1, Math.floor((minutes * 60) / perItemSec));
+    const introDays = toIntroduce > 0 ? Math.ceil(toIntroduce / perDay) : 0;
+    return Math.max(introDays > 0 ? introDays + ladderSum : 0, pipelineTail);
+  }
+
+  // Time: intro rep + 3 re-proofs per not-yet-cold item, +20% for lapses.
+  const scale = effectiveScale({
+    superdayMs,
+    newRemaining: toIntroduce,
+    dailyMinutes,
+    now,
+    reviewSec,
+  });
+  const lastRung = Math.max(1, Math.round(SOLIDIFY_LADDER_DAYS[COLD_AT_STEP - 1]! * scale));
+  const reviewReps =
+    toIntroduce * COLD_AT_STEP +
+    solidifyingTailDays.reduce((n, tail) => n + Math.max(1, Math.ceil(tail / lastRung)), 0);
+  const totalSec = (toIntroduce * newSec + reviewReps * reviewSec) * 1.2;
   const totalMinutesLeft = Math.round(totalSec / 60);
 
-  // Calendar: how many days until the last item's final re-proof?
-  const perDay = Math.max(1, Math.floor((dailyMinutes * 60) / (newSec + COLD_AT_STEP * reviewSec)));
-  const introDays = toIntroduce > 0 ? Math.ceil(toIntroduce / perDay) : 0;
-  const pipelineTail = solidifyingTailDays.reduce((max, t) => Math.max(max, t), 0);
-  const daysToCold = Math.max(
-    introDays > 0 ? introDays - 1 + ladderSum + 1 : 0,
-    pipelineTail,
-  );
-  const coldByMs = dayStart(now) + daysToCold * DAY_MS;
+  const coldByMs = dayStart(now) + daysToCold(dailyMinutes) * DAY_MS;
 
   let onPace: boolean | null = null;
   let suggestedDailyMinutes: number | null = null;
   if (superdayMs != null && remaining > 0) {
     const sweepStart = dayStart(superdayMs) - FINAL_SWEEP_DAYS * DAY_MS;
     onPace = coldByMs <= sweepStart;
-    if (!onPace && toIntroduce > 0) {
-      const introDaysAvailable = Math.max(1, daysUntil(superdayMs, now) - FINAL_SWEEP_DAYS - ladderSum);
-      const neededPerDay = Math.ceil(toIntroduce / introDaysAvailable);
-      suggestedDailyMinutes = Math.min(
-        360,
-        Math.ceil((neededPerDay * (newSec + COLD_AT_STEP * reviewSec)) / 60 / 5) * 5,
-      );
+    if (!onPace) {
+      // Smallest quarter-hour budget that actually lands before the sweep.
+      for (let m = dailyMinutes + 15; m <= MAX_SUGGESTED_MINUTES; m += 15) {
+        if (dayStart(now) + daysToCold(m) * DAY_MS <= sweepStart) {
+          suggestedDailyMinutes = m;
+          break;
+        }
+      }
     }
   }
 
